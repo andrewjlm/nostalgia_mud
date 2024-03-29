@@ -1,5 +1,11 @@
-// TODO: Distinguish between messages from the game to connections and vice versa
-pub enum Message {
-    PlayerMessage(String),
-    // Whatever other messages we need
+// Messages that connections can send to the game loop
+pub enum PlayerMessage {
+    // Global Chat
+    Gossip(String),
+}
+
+// Messages that the game loop can send to connections
+pub enum GameMessage {
+    // Global Chat
+    Gossip(String),
 }

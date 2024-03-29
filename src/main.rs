@@ -13,7 +13,7 @@ mod player;
 mod telnet;
 
 use connection::handle_connection;
-use message::Message;
+use message::{GameMessage, PlayerMessage};
 
 // TODO Some sort of structured logging ideally that would associate things like the game loop and
 // various connection attributes
@@ -43,7 +43,7 @@ async fn main() {
     }
 }
 
-async fn game_loop(players: player::Players, mut receiver: mpsc::Receiver<Message>) {
+async fn game_loop(players: player::Players, mut receiver: mpsc::Receiver<PlayerMessage>) {
     log::info!("Game loop spawned");
     loop {
         // Game logic goes here
@@ -52,8 +52,13 @@ async fn game_loop(players: player::Players, mut receiver: mpsc::Receiver<Messag
         // TODO: Figure out proper tick length
         while let Some(message) = receiver.recv().await {
             match message {
-                Message::PlayerMessage(content) => {
-                    log::debug!("Received message from player: {}", content.trim());
+                PlayerMessage::Gossip(content) => {
+                    log::debug!("Received gossip from player: {}", content.trim());
+
+                    for player in players.lock().unwrap().values() {
+                        log::debug!("Sending gossip to player {}", player.username);
+                        player.game_message(GameMessage::Gossip(content.clone()));
+                    }
                 }
             }
         }

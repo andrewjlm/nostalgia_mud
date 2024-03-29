@@ -1,4 +1,4 @@
-use crate::message::Message;
+use crate::message::GameMessage;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -7,18 +7,22 @@ pub struct Player {
     // TODO: Is this really how we want to handle player IDs?
     pub id: u32,
     pub username: String,
-    // TODO: Make this private?
-    pub sender: mpsc::Sender<Message>,
+    // Sender for sending GameMessages to the player
+    sender: mpsc::UnboundedSender<GameMessage>,
 }
 
 impl Player {
-    pub fn new(players: Players, sender: mpsc::Sender<Message>) -> Player {
+    pub fn new(players: Players, sender: mpsc::UnboundedSender<GameMessage>) -> Player {
         let player_id = generate_player_id(players);
         Player {
             id: player_id,
             username: format!("Player{}", player_id),
             sender,
         }
+    }
+
+    pub fn game_message(&self, message: GameMessage) {
+        self.sender.send(message);
     }
 }
 
