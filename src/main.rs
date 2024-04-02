@@ -43,55 +43,65 @@ async fn main() {
     }
 }
 
+async fn tick() {
+    // TODO: Figure out proper tick length
+    log::debug!("Tick!");
+    sleep(Duration::from_millis(1000)).await
+}
+
+async fn read_commands(players: &player::Players, receiver: &mut mpsc::Receiver<RawCommand>) {
+    // Game logic goes here
+    // Update game state, send messages to players, etc.
+    // Access players map using players.read().unwrap()
+    while let Some(raw_command) = receiver.recv().await {
+        // Interpret the command
+        let command = raw_command.interpret();
+
+        // Get the sending player
+        let sending_player = {
+            let players = players.read().unwrap();
+            players.get(&raw_command.sender()).cloned()
+        };
+
+        if let Some(sending_player) = sending_player {
+            if let Some(player_message) = command {
+                match player_message {
+                    PlayerMessage::Gossip(content) => {
+                        log::debug!(
+                            "Received gossip from player: {} - {}",
+                            sending_player.username,
+                            content.trim()
+                        );
+
+                        for player in players.read().unwrap().values() {
+                            log::debug!("Sending gossip to player {}", player.username);
+                            player.game_message(GameMessage::Gossip(
+                                content.clone(),
+                                sending_player.username.clone(),
+                            ));
+                        }
+                    }
+                }
+            } else {
+                log::debug!("Failed to parse player message: {:?}", raw_command);
+                sending_player.game_message(GameMessage::NotParsed);
+            }
+        } else {
+            // NOTE: I'm not sure if this can happen
+            log::warn!(
+                "Unable to find sending player for command: {:?}",
+                raw_command
+            );
+        }
+    }
+}
+
 async fn game_loop(players: player::Players, mut receiver: mpsc::Receiver<RawCommand>) {
     log::info!("Game loop spawned");
     loop {
-        // Game logic goes here
-        // Update game state, send messages to players, etc.
-        // Access players map using players.lock().unwrap()
-        while let Some(raw_command) = receiver.recv().await {
-            // Interpret the command
-            let command = raw_command.interpret();
-
-            // Get the sending player
-            let sending_player = {
-                let players = players.read().unwrap();
-                players.get(&raw_command.sender()).cloned()
-            };
-
-            if let Some(sending_player) = sending_player {
-                if let Some(player_message) = command {
-                    match player_message {
-                        PlayerMessage::Gossip(content) => {
-                            log::debug!(
-                                "Received gossip from player: {} - {}",
-                                sending_player.username,
-                                content.trim()
-                            );
-
-                            for player in players.read().unwrap().values() {
-                                log::debug!("Sending gossip to player {}", player.username);
-                                player.game_message(GameMessage::Gossip(
-                                    content.clone(),
-                                    sending_player.username.clone(),
-                                ));
-                            }
-                        }
-                    }
-                } else {
-                    log::debug!("Failed to parse player message: {:?}", raw_command);
-                    sending_player.game_message(GameMessage::NotParsed);
-                }
-            } else {
-                // NOTE: I'm not sure if this can happen
-                log::warn!(
-                    "Unable to find sending player for command: {:?}",
-                    raw_command
-                );
-            }
+        tokio::select! {
+            game_clock = tick() => {},
+            commands = read_commands(&players, &mut receiver) => {},
         }
-        // TODO: Figure out proper tick length
-        sleep(Duration::from_millis(1000)).await;
-        log::debug!("Tick!");
     }
 }
