@@ -1,5 +1,5 @@
 use crate::{
-    message::{GameMessage, PlayerMessage},
+    message::{GameMessage, RawCommand},
     player::{Player, Players},
     telnet::{parse_telnet_event, TelnetEvent},
 };
@@ -11,37 +11,10 @@ use tokio::{
     sync::mpsc,
 };
 
-fn interpret_message(message: &str) -> Option<PlayerMessage> {
-    // Get the first word (assumed to be the command)
-    let mut parts = message.split_whitespace();
-
-    match parts.next() {
-        Some(cmd) => {
-            // NOTE: We don't care about casing of our command
-            let cmd = cmd.to_lowercase();
-            let rest = parts.next().unwrap_or("").trim();
-
-            match cmd.as_str() {
-                "." | "gossip" => {
-                    if rest.is_empty() {
-                        // TODO: Should this alert somehow?
-                        None
-                    } else {
-                        Some(PlayerMessage::Gossip(rest.to_string()))
-                    }
-                }
-                // TODO: Under what circumstances can this happen?
-                _ => None,
-            }
-        }
-        None => None,
-    }
-}
-
 pub async fn handle_connection(
     players: Players,
     mut stream: TcpStream,
-    game_sender: mpsc::Sender<PlayerMessage>,
+    game_sender: mpsc::Sender<RawCommand>,
 ) {
     // Generate a communication channel
     let (player_sender, mut player_receiver) = mpsc::unbounded_channel();
@@ -52,7 +25,7 @@ pub async fn handle_connection(
     let player = Arc::new(Player::new(players.clone(), player_sender));
 
     // Add the player to the connected players map
-    players.lock().unwrap().insert(player.id, player.clone());
+    players.write().unwrap().insert(player.id, player.clone());
 
     log::info!("New player connected: {:?}", player.username);
 
@@ -81,20 +54,10 @@ pub async fn handle_connection(
                                 player.id,
                                 message.trim()
                             );
-                            // Interpret the message
-                            let parsed_message = interpret_message(&message);
 
-                            // If we were able to parse it, send it to the game
-                            if let Some(player_message) = parsed_message {
-                                game_sender.send(player_message).await;
-                            } else {
-                                // TODO: Tell the player we didn't understand them
-                                log::debug!(
-                                    "Unable to parse message from player {}: {}",
-                                    player.id,
-                                    &message.trim()
-                                );
-                            }
+                            // Send the raw message to the game annotated with the player ID
+                            let raw_command = RawCommand::new(player.id, message.to_string());
+                            game_sender.send(raw_command).await;
                         }
                         _ => {
                             // TODO: Figure out if we actually need to handle - wondering about 244
@@ -107,15 +70,20 @@ pub async fn handle_connection(
             game_message = player_receiver.recv() => {
                 if let Some(message) = game_message {
                  match message {
-                    GameMessage::Gossip(content) => {
+                    GameMessage::Gossip(content, sending_user) => {
                         log::debug!(
-                           "Player {} received gossip from game: {}",
+                           "Player {} received gossip from game: {} - {}",
                           player.id,
+                           sending_user,
                          content
                     );
-                        let response = format!("Gossip: {}\r\n", content);
+                        let response = format!("Gossip <{}>: {}\r\n", sending_user, content);
                         stream.write_all(response.as_bytes()).await.unwrap();
                 }
+                    GameMessage::NotParsed => {
+                        let response = "Arglebargle, glop-glyf!?!?!\r\n";
+                        stream.write_all(response.as_bytes()).await.unwrap();
+                    }
             }
             }
             }
@@ -123,6 +91,6 @@ pub async fn handle_connection(
     }
 
     // Remove the player from the connected players map when the connection is closed
-    players.lock().unwrap().remove(&player.id);
+    players.write().unwrap().remove(&player.id);
     log::info!("Player {} disconnected", player.id);
 }

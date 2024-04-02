@@ -1,6 +1,6 @@
 use crate::message::GameMessage;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 
 pub struct Player {
@@ -27,13 +27,14 @@ impl Player {
 }
 
 // Type aliases for ease of use
-pub type Players = Arc<Mutex<HashMap<u32, Arc<Player>>>>;
+pub type Players = Arc<RwLock<HashMap<u32, Arc<Player>>>>;
 
 // TODO: Make this a method or associated function on Player?
 fn generate_player_id(players: Players) -> u32 {
     // TODO: This seems horribly inefficient
     let mut id = 1;
-    while players.lock().unwrap().contains_key(&id) {
+    // NOTE: We don't technically write here but I think we want an exclusive lock
+    while players.write().unwrap().contains_key(&id) {
         id += 1;
     }
     id

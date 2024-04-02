@@ -1,6 +1,6 @@
 use log;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use tokio::{
     net::TcpListener,
     sync::mpsc,
@@ -13,7 +13,7 @@ mod player;
 mod telnet;
 
 use connection::handle_connection;
-use message::{GameMessage, PlayerMessage};
+use message::{GameMessage, PlayerMessage, RawCommand};
 
 // TODO Some sort of structured logging ideally that would associate things like the game loop and
 // various connection attributes
@@ -26,7 +26,7 @@ async fn main() {
     let listener = TcpListener::bind("127.0.0.1:4073").await.unwrap();
     log::info!("Telnet server started on localhost:4073");
 
-    let players: player::Players = Arc::new(Mutex::new(HashMap::new()));
+    let players: player::Players = Arc::new(RwLock::new(HashMap::new()));
 
     // Channel shared among clients and the game loop
     let (game_sender, game_receiver) = mpsc::channel(32);
@@ -43,25 +43,54 @@ async fn main() {
     }
 }
 
-async fn game_loop(players: player::Players, mut receiver: mpsc::Receiver<PlayerMessage>) {
+async fn game_loop(players: player::Players, mut receiver: mpsc::Receiver<RawCommand>) {
     log::info!("Game loop spawned");
     loop {
         // Game logic goes here
         // Update game state, send messages to players, etc.
         // Access players map using players.lock().unwrap()
-        // TODO: Figure out proper tick length
-        while let Some(message) = receiver.recv().await {
-            match message {
-                PlayerMessage::Gossip(content) => {
-                    log::debug!("Received gossip from player: {}", content.trim());
+        while let Some(raw_command) = receiver.recv().await {
+            // Interpret the command
+            let command = raw_command.interpret();
 
-                    for player in players.lock().unwrap().values() {
-                        log::debug!("Sending gossip to player {}", player.username);
-                        player.game_message(GameMessage::Gossip(content.clone()));
+            // Get the sending player
+            let sending_player = {
+                let players = players.read().unwrap();
+                players.get(&raw_command.sender()).cloned()
+            };
+
+            if let Some(sending_player) = sending_player {
+                if let Some(player_message) = command {
+                    match player_message {
+                        PlayerMessage::Gossip(content) => {
+                            log::debug!(
+                                "Received gossip from player: {} - {}",
+                                sending_player.username,
+                                content.trim()
+                            );
+
+                            for player in players.read().unwrap().values() {
+                                log::debug!("Sending gossip to player {}", player.username);
+                                player.game_message(GameMessage::Gossip(
+                                    content.clone(),
+                                    sending_player.username.clone(),
+                                ));
+                            }
+                        }
                     }
+                } else {
+                    log::debug!("Failed to parse player message: {:?}", raw_command);
+                    sending_player.game_message(GameMessage::NotParsed);
                 }
+            } else {
+                // NOTE: I'm not sure if this can happen
+                log::warn!(
+                    "Unable to find sending player for command: {:?}",
+                    raw_command
+                );
             }
         }
+        // TODO: Figure out proper tick length
         sleep(Duration::from_millis(1000)).await;
         log::debug!("Tick!");
     }
