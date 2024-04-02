@@ -12,11 +12,15 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(players: Players, sender: mpsc::UnboundedSender<GameMessage>) -> Player {
+    pub fn new(
+        username: String,
+        players: Players,
+        sender: mpsc::UnboundedSender<GameMessage>,
+    ) -> Player {
         let player_id = generate_player_id(players);
         Player {
             id: player_id,
-            username: format!("Player{}", player_id),
+            username: username,
             sender,
         }
     }

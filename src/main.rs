@@ -100,8 +100,8 @@ async fn game_loop(players: player::Players, mut receiver: mpsc::Receiver<RawCom
     log::info!("Game loop spawned");
     loop {
         tokio::select! {
-            game_clock = tick() => {},
-            commands = read_commands(&players, &mut receiver) => {},
+            _game_clock = tick() => {},
+            _commands = read_commands(&players, &mut receiver) => {},
         }
     }
 }
