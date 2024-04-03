@@ -70,57 +70,65 @@ pub async fn handle_connection(
         // TODO: Buffered reading?
         loop {
             tokio::select! {
-                    bytes_read = stream.read(&mut buffer) => {
+                bytes_read = stream.read(&mut buffer) => {
+                    match bytes_read {
+                        Ok(0) => {
+                            // Connection closed by remote peer
+                            log::info!("Client {} disconnected", &player.id);
+                            players.write().unwrap().remove(&player.id);
+                            return
+                        }
+                        Ok(n) => {
+                            telnet_buffer.extend_from_slice(&buffer[..n]);
 
-                    let bytes_read = bytes_read.unwrap();
+                            while let Some(event) = parse_telnet_event(&mut telnet_buffer) {
+                                match event {
+                                    TelnetEvent::Data(bytes) => {
+                                        let message = String::from_utf8_lossy(&bytes);
+                                        log::debug!(
+                                            "Received message from player {}: {}",
+                                            player.id,
+                                            message.trim()
+                                        );
 
-                    if bytes_read == 0 {
-                        break;
-                    }
-
-                    telnet_buffer.extend_from_slice(&buffer[..bytes_read]);
-
-                    while let Some(event) = parse_telnet_event(&mut telnet_buffer) {
-                        match event {
-                            TelnetEvent::Data(bytes) => {
-                                let message = String::from_utf8_lossy(&bytes);
-                                log::debug!(
-                                    "Received message from player {}: {}",
-                                    player.id,
-                                    message.trim()
-                                );
-
-                                // Send the raw message to the game annotated with the player ID
-                                let raw_command = RawCommand::new(player.id, message.to_string());
-                                game_sender.send(raw_command).await;
+                                        // Send the raw message to the game annotated with the player ID
+                                        let raw_command = RawCommand::new(player.id, message.to_string());
+                                        game_sender.send(raw_command).await;
+                                    }
+                                    _ => {
+                                        // TODO: Figure out if we actually need to handle - wondering about 244
+                                        // (disconnect?)
+                                        log::warn!("Received unhandled TelnetEvent: {:?}", event);
+                                    }
+                                }
                             }
-                            _ => {
-                                // TODO: Figure out if we actually need to handle - wondering about 244
-                                // (disconnect?)
-                                log::warn!("Received unhandled TelnetEvent: {:?}", event);
-                            }
+                        }
+                        Err(e) => {
+                            log::error!("Error reading from stream: {}", e);
+                            players.write().unwrap().remove(&player.id);
+                            return
                         }
                     }
                 }
                 game_message = player_receiver.recv() => {
                     if let Some(message) = game_message {
-                     match message {
-                        GameMessage::Gossip(content, sending_user) => {
-                            log::debug!(
-                               "Player {} received gossip from game: {} - {}",
-                              player.id,
-                               sending_user,
-                             content
-                        );
-                            let response = format!("Gossip <{}>: {}\r\n", sending_user, content);
-                            stream.write_all(response.as_bytes()).await.unwrap();
-                    }
-                        GameMessage::NotParsed => {
-                            let response = "Arglebargle, glop-glyf!?!?!\r\n";
-                            stream.write_all(response.as_bytes()).await.unwrap();
+                        match message {
+                            GameMessage::Gossip(content, sending_user) => {
+                                log::debug!(
+                                    "Player {} received gossip from game: {} - {}",
+                                    player.id,
+                                    sending_user,
+                                    content
+                                );
+                                let response = format!("Gossip <{}>: {}\r\n", sending_user, content);
+                                stream.write_all(response.as_bytes()).await.unwrap();
+                            }
+                            GameMessage::NotParsed => {
+                                let response = "Arglebargle, glop-glyf!?!?!\r\n";
+                                stream.write_all(response.as_bytes()).await.unwrap();
+                            }
                         }
-                }
-                }
+                    }
                 }
             }
         }
