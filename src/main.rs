@@ -104,6 +104,18 @@ async fn read_commands(
                         {
                             log::debug!("Moving player {} to {}", direction, exit);
                             sending_player.move_to_room(*exit);
+                            // TODO: There is probably some better way to architect so that "Look"
+                            // logic is only written once
+                            if let Some(room) = world.get_player_room(&sending_player) {
+                                sending_player.game_message(GameMessage::Look(format!(
+                                    "{}\n{}",
+                                    room.name, room.description
+                                )));
+                            }
+                            // TODO: Make configurable if we send the full room or a "glance" (just
+                            // the room name and exits)
+                        } else {
+                            sending_player.game_message(GameMessage::NoExit(direction));
                         }
                         // TODO: Probably tell the user if there is no exit
                     }

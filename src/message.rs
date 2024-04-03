@@ -86,5 +86,6 @@ pub enum GameMessage {
     // Global Chat
     Gossip(String, String),
     Look(String),
+    NoExit(Direction),
     NotParsed,
 }

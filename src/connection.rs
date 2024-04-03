@@ -127,6 +127,13 @@ pub async fn handle_connection(
                                     let response = "Arglebargle, glop-glyf!?!?!\r\n";
                                     telnet.write_all(response.as_bytes()).await;
                                 }
+                                GameMessage::NoExit(direction) => {
+                                    // TODO: This will read sort of awkward (eg "You don't see an
+                                    // exit north from here" when we'd probably say "north of
+                                    // here"). Should figure out a way to get consistent.
+                                    let response = format!("You don't see an exit {} from here\r\n", direction);
+                                    telnet.write_all(response.as_bytes()).await;
+                                }
                             }
                         }
                     }
