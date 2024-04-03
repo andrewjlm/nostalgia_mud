@@ -10,7 +10,9 @@ use tokio::{
 mod connection;
 mod message;
 mod player;
+mod room;
 mod telnet;
+mod world;
 
 use connection::handle_connection;
 use message::{GameMessage, PlayerMessage, RawCommand};
@@ -27,11 +29,12 @@ async fn main() {
     log::info!("Telnet server started on localhost:4073");
 
     let players: player::Players = Arc::new(RwLock::new(HashMap::new()));
+    let world = Arc::new(world::get_sample_world());
 
     // Channel shared among clients and the game loop
     let (game_sender, game_receiver) = mpsc::channel(32);
 
-    tokio::spawn(game_loop(players.clone(), game_receiver));
+    tokio::spawn(game_loop(players.clone(), world.clone(), game_receiver));
 
     loop {
         let (stream, _) = listener.accept().await.unwrap();
@@ -49,7 +52,11 @@ async fn tick() {
     sleep(Duration::from_millis(1000)).await
 }
 
-async fn read_commands(players: &player::Players, receiver: &mut mpsc::Receiver<RawCommand>) {
+async fn read_commands(
+    players: &player::Players,
+    world: &Arc<world::World>,
+    receiver: &mut mpsc::Receiver<RawCommand>,
+) {
     // Game logic goes here
     // Update game state, send messages to players, etc.
     // Access players map using players.read().unwrap()
@@ -57,13 +64,7 @@ async fn read_commands(players: &player::Players, receiver: &mut mpsc::Receiver<
         // Interpret the command
         let command = raw_command.interpret();
 
-        // Get the sending player
-        let sending_player = {
-            let players = players.read().unwrap();
-            players.get(&raw_command.sender()).cloned()
-        };
-
-        if let Some(sending_player) = sending_player {
+        if let Some(mut sending_player) = players.write().unwrap().get_mut(&raw_command.sender()) {
             if let Some(player_message) = command {
                 match player_message {
                     PlayerMessage::Gossip(content) => {
@@ -81,6 +82,39 @@ async fn read_commands(players: &player::Players, receiver: &mut mpsc::Receiver<
                             ));
                         }
                     }
+                    PlayerMessage::Look => {
+                        log::debug!("Received look from player: {}", sending_player.username);
+                        // TODO: Again, what if they're in a non-existent room or something
+                        if let Some(room) = world.get_player_room(&sending_player) {
+                            sending_player.game_message(GameMessage::Look(format!(
+                                "{}\n{}",
+                                room.name, room.description
+                            )));
+                        }
+                    }
+                    PlayerMessage::Move(direction) => {
+                        log::debug!(
+                            "Received move from player: {} - {:?}",
+                            sending_player.username,
+                            direction
+                        );
+                        if let Some(exit) = world
+                            .get_player_room(&sending_player)
+                            .and_then(|player_room| player_room.get_exit(&direction.to_string()))
+                        {
+                            log::debug!("Moving player {} to {}", direction, exit);
+                            sending_player.move_to_room(*exit);
+                        }
+                        // TODO: Probably tell the user if there is no exit
+                    }
+                    PlayerMessage::Contextual(command, arguments) => {
+                        log::debug!(
+                            "Failed to parse potential contextual player message: {} - {}",
+                            command,
+                            arguments
+                        );
+                        sending_player.game_message(GameMessage::NotParsed);
+                    }
                 }
             } else {
                 log::debug!("Failed to parse player message: {:?}", raw_command);
@@ -89,19 +123,23 @@ async fn read_commands(players: &player::Players, receiver: &mut mpsc::Receiver<
         } else {
             // NOTE: I'm not sure if this can happen
             log::warn!(
-                "Unable to find sending player for command: {:?}",
+                "Unable to get mutable sending player for command: {:?}",
                 raw_command
             );
         }
     }
 }
 
-async fn game_loop(players: player::Players, mut receiver: mpsc::Receiver<RawCommand>) {
+async fn game_loop(
+    players: player::Players,
+    world: Arc<world::World>,
+    mut receiver: mpsc::Receiver<RawCommand>,
+) {
     log::info!("Game loop spawned");
     loop {
         tokio::select! {
             _game_clock = tick() => {},
-            _commands = read_commands(&players, &mut receiver) => {},
+            _commands = read_commands(&players, &world, &mut receiver) => {},
         }
     }
 }

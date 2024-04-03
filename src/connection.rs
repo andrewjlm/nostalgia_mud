@@ -54,10 +54,15 @@ pub async fn handle_connection(
     // Dispatch to the login flow
     if let Some(username) = login(&mut telnet, players.clone()).await {
         // Create a new player instance
-        let player = Arc::new(Player::new(username, players.clone(), player_sender));
+        // TODO: Right now everyone ALWAYS starts in the same room. Also, if Room 1 doesn't
+        // exist... not sure what happens but presumably bad
+        let player = Player::new(username, players.clone(), player_sender, 1);
+
+        // Reserve a copy of the ID for retrieval
+        let player_id = player.id;
 
         // Add the player to the connected players map
-        players.write().unwrap().insert(player.id, player.clone());
+        players.write().unwrap().insert(player_id, player.clone());
 
         log::info!("New player connected: {:?}", player.username);
 
@@ -66,46 +71,69 @@ pub async fn handle_connection(
 
         // TODO: Buffered reading?
         loop {
-            tokio::select! {
-                message = read_from_buffer(&mut buffer, &mut telnet_buffer, &mut telnet) => {
-                    if let Some(bytes) = message {
-                        let message = String::from_utf8_lossy(&bytes);
-                        log::debug!(
-                            "Received message from player {}: {}",
-                            player.id,
-                            message.trim()
-                        );
+            // NOTE: Once we have the player in the RwLocked HashMap, we should never use the
+            // *original* player so we retrieve it here
+            let player = {
+                let players_guard = players.read().unwrap();
+                players_guard.get(&player_id).cloned()
+            };
 
-                        // Send the raw message to the game annotated with the player ID
-                        let raw_command = RawCommand::new(player.id, message.to_string());
-                        game_sender.send(raw_command).await;
-                    } else {
-                        // Remove the player from the connected players map when the connection is closed
-                        players.write().unwrap().remove(&player.id);
-                        log::info!("Player {} disconnected", player.id);
-                        return
+            if let Some(player) = player {
+                tokio::select! {
+                    message = read_from_buffer(&mut buffer, &mut telnet_buffer, &mut telnet) => {
+                        if let Some(bytes) = message {
+                            let message = String::from_utf8_lossy(&bytes);
+                            log::debug!(
+                                "Received message from player {}: {}",
+                                player.id,
+                                message.trim()
+                            );
+
+                            // Send the raw message to the game annotated with the player ID
+                            let raw_command = RawCommand::new(player.id, message.to_string());
+                            game_sender.send(raw_command).await;
+                        } else {
+                            // Remove the player from the connected players map when the connection is closed
+                            players.write().unwrap().remove(&player.id);
+                            log::info!("Player {} disconnected", player.id);
+                            return
+                        }
                     }
-                }
-                game_message = player_receiver.recv() => {
-                    if let Some(message) = game_message {
-                        match message {
-                            GameMessage::Gossip(content, sending_user) => {
-                                log::debug!(
-                                    "Player {} received gossip from game: {} - {}",
-                                    player.id,
-                                    sending_user,
-                                    content
-                                );
-                                let response = format!("Gossip <{}>: {}\r\n", sending_user, content);
-                                telnet.write_all(response.as_bytes()).await;
-                            }
-                            GameMessage::NotParsed => {
-                                let response = "Arglebargle, glop-glyf!?!?!\r\n";
-                                telnet.write_all(response.as_bytes()).await;
+                    game_message = player_receiver.recv() => {
+                        if let Some(message) = game_message {
+                            match message {
+                                // TODO: Some low hanging fruit for consolidation here, just match and
+                                // return the response then write at the end (if we get one)
+                                GameMessage::Gossip(content, sending_user) => {
+                                    log::debug!(
+                                        "Player {} received gossip from game: {} - {}",
+                                        player.id,
+                                        sending_user,
+                                        content
+                                    );
+                                    let response = format!("Gossip <{}>: {}\r\n", sending_user, content);
+                                    telnet.write_all(response.as_bytes()).await;
+                                }
+                                GameMessage::Look(description) => {
+                                    log::debug!(
+                                        "Player {} looked, saw {}",
+                                        player.id,
+                                        description
+                                        );
+                                    let response = format!("{}\r\n", description);
+                                    telnet.write_all(response.as_bytes()).await;
+                                }
+                                GameMessage::NotParsed => {
+                                    let response = "Arglebargle, glop-glyf!?!?!\r\n";
+                                    telnet.write_all(response.as_bytes()).await;
+                                }
                             }
                         }
                     }
                 }
+            } else {
+                // Player not found, exit the loop
+                break;
             }
         }
     }
