@@ -4,10 +4,9 @@ use crate::{
     telnet::{read_from_buffer, TelnetWrapper},
 };
 use log;
-use std::sync::Arc;
 use tokio::{net::TcpStream, sync::mpsc};
 
-async fn login(telnet: &mut TelnetWrapper, players: Players) -> Option<String> {
+async fn login(telnet: &mut TelnetWrapper, players: &Players) -> Option<String> {
     loop {
         telnet.write_all(b"Enter a username: ").await;
 
@@ -24,12 +23,7 @@ async fn login(telnet: &mut TelnetWrapper, players: Players) -> Option<String> {
                 .trim()
                 .to_string();
 
-            if players
-                .read()
-                .unwrap()
-                .values()
-                .any(|p| p.username == username)
-            {
+            if players.read().values().any(|p| p.username == username) {
                 telnet
                     .write_all(b"Username already taken. Try again.\r\n")
                     .await;
@@ -44,7 +38,7 @@ async fn login(telnet: &mut TelnetWrapper, players: Players) -> Option<String> {
 
 pub async fn handle_connection(
     players: Players,
-    mut stream: TcpStream,
+    stream: TcpStream,
     game_sender: mpsc::Sender<RawCommand>,
 ) {
     // Generate a communication channel
@@ -52,17 +46,17 @@ pub async fn handle_connection(
     let mut telnet = TelnetWrapper::new(stream);
 
     // Dispatch to the login flow
-    if let Some(username) = login(&mut telnet, players.clone()).await {
+    if let Some(username) = login(&mut telnet, &players).await {
         // Create a new player instance
         // TODO: Right now everyone ALWAYS starts in the same room. Also, if Room 1 doesn't
         // exist... not sure what happens but presumably bad
-        let player = Player::new(username, players.clone(), player_sender, 1);
+        let player = Player::new(username, &players, player_sender, 1);
 
         // Reserve a copy of the ID for retrieval
         let player_id = player.id;
 
         // Add the player to the connected players map
-        players.write().unwrap().insert(player_id, player.clone());
+        players.write().insert(player_id, player.clone());
 
         log::info!("New player connected: {:?}", player.username);
 
@@ -74,7 +68,7 @@ pub async fn handle_connection(
             // NOTE: Once we have the player in the RwLocked HashMap, we should never use the
             // *original* player so we retrieve it here
             let player = {
-                let players_guard = players.read().unwrap();
+                let players_guard = players.read();
                 players_guard.get(&player_id).cloned()
             };
 
@@ -94,7 +88,7 @@ pub async fn handle_connection(
                             game_sender.send(raw_command).await;
                         } else {
                             // Remove the player from the connected players map when the connection is closed
-                            players.write().unwrap().remove(&player.id);
+                            players.write().remove(&player.id);
                             log::info!("Player {} disconnected", player.id);
                             return
                         }

@@ -22,8 +22,7 @@ pub async fn read_commands(
             match player_message {
                 PlayerMessage::Gossip(content) => {
                     let sending_player_username = {
-                        let players_guard = players.read().unwrap();
-                        if let Some(sending_player) = players_guard.get(&raw_command.sender()) {
+                        if let Some(sending_player) = players.read().get(&raw_command.sender()) {
                             sending_player.username.clone()
                         } else {
                             continue;
@@ -36,7 +35,7 @@ pub async fn read_commands(
                         content.trim()
                     );
 
-                    for player in players.read().unwrap().values() {
+                    for player in players.read().values() {
                         log::debug!("Sending gossip to player {}", player.username);
                         player.game_message(GameMessage::Gossip(
                             content.clone(),
@@ -45,8 +44,7 @@ pub async fn read_commands(
                     }
                 }
                 PlayerMessage::Look => {
-                    let mut players_guard = players.write().unwrap();
-                    if let Some(sending_player) = players_guard.get_mut(&raw_command.sender()) {
+                    if let Some(sending_player) = players.write().get_mut(&raw_command.sender()) {
                         log::debug!("Received look from player: {}", sending_player.username);
                         // TODO: Again, what if they're in a non-existent room or something
                         if let Some(room) = world.get_player_room(&sending_player) {
@@ -58,8 +56,7 @@ pub async fn read_commands(
                     }
                 }
                 PlayerMessage::Move(direction) => {
-                    let mut players_guard = players.write().unwrap();
-                    if let Some(sending_player) = players_guard.get_mut(&raw_command.sender()) {
+                    if let Some(sending_player) = players.write().get_mut(&raw_command.sender()) {
                         log::debug!(
                             "Received move from player: {} - {:?}",
                             sending_player.username,
@@ -93,15 +90,13 @@ pub async fn read_commands(
                         command,
                         arguments
                     );
-                    let players_guard = players.read().unwrap();
-                    if let Some(sending_player) = players_guard.get(&raw_command.sender()) {
+                    if let Some(sending_player) = players.read().get(&raw_command.sender()) {
                         sending_player.game_message(GameMessage::NotParsed);
                     }
                 }
             }
         } else {
-            let players_guard = players.read().unwrap();
-            if let Some(sending_player) = players_guard.get(&raw_command.sender()) {
+            if let Some(sending_player) = players.read().get(&raw_command.sender()) {
                 log::debug!("Failed to parse player message: {:?}", raw_command);
                 sending_player.game_message(GameMessage::NotParsed);
             }

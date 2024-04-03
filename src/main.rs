@@ -1,8 +1,8 @@
 use log;
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use tokio::{net::TcpListener, sync::mpsc};
 
+mod action;
 mod connection;
 mod game_loop;
 mod message;
@@ -25,7 +25,7 @@ async fn main() {
     let listener = TcpListener::bind("127.0.0.1:4073").await.unwrap();
     log::info!("Telnet server started on localhost:4073");
 
-    let players: player::Players = Arc::new(RwLock::new(HashMap::new()));
+    let players = player::Players::new();
     let world = Arc::new(world::get_sample_world());
 
     // Channel shared among clients and the game loop
@@ -35,8 +35,8 @@ async fn main() {
 
     loop {
         let (stream, _) = listener.accept().await.unwrap();
-        let players_clone = players.clone();
         let sender_clone = game_sender.clone();
+        let players_clone = players.clone();
         tokio::spawn(async move {
             handle_connection(players_clone, stream, sender_clone).await;
         });

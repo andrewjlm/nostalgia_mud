@@ -1,6 +1,6 @@
 use crate::message::GameMessage;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tokio::sync::mpsc;
 
 #[derive(Clone, Debug)]
@@ -17,7 +17,7 @@ pub struct Player {
 impl Player {
     pub fn new(
         username: String,
-        players: Players,
+        players: &Players,
         sender: mpsc::UnboundedSender<GameMessage>,
         starting_room: u32,
     ) -> Player {
@@ -42,15 +42,38 @@ impl Player {
     }
 }
 
-// Type aliases for ease of use
-pub type Players = Arc<RwLock<HashMap<u32, Player>>>;
+// newtype for ease of use
+// We can derive Clone for free because it's a wrapper around Arc
+#[derive(Clone)]
+pub struct Players(Arc<RwLock<HashMap<u32, Player>>>);
+
+impl Players {
+    pub fn new() -> Self {
+        Players(Arc::new(RwLock::new(HashMap::new())))
+    }
+
+    pub fn read(&self) -> RwLockReadGuard<HashMap<u32, Player>> {
+        self.0.read().unwrap()
+    }
+
+    pub fn write(&self) -> RwLockWriteGuard<HashMap<u32, Player>> {
+        self.0.write().unwrap()
+    }
+    // pub fn read(&self) -> impl std::ops::Deref<Target = HashMap<u32, Player>> + '_ {
+    //self.0.read().unwrap().clone()
+    //}
+
+    // pub fn write(&self) -> impl std::ops::DerefMut<Target = HashMap<u32, Player>> + '_ {
+    // self.0.write().unwrap().clone()
+    // }
+}
 
 // TODO: Make this a method or associated function on Player?
-fn generate_player_id(players: Players) -> u32 {
+fn generate_player_id(players: &Players) -> u32 {
     // TODO: This seems horribly inefficient
     let mut id = 1;
     // NOTE: We don't technically write here but I think we want an exclusive lock
-    while players.write().unwrap().contains_key(&id) {
+    while players.write().contains_key(&id) {
         id += 1;
     }
     id
