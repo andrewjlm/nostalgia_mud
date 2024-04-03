@@ -1,47 +1,43 @@
 use crate::{
     message::{GameMessage, RawCommand},
     player::{Player, Players},
-    telnet::{parse_telnet_event, TelnetEvent},
+    telnet::{read_from_buffer, TelnetWrapper},
 };
 use log;
 use std::sync::Arc;
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-    sync::mpsc,
-};
+use tokio::{net::TcpStream, sync::mpsc};
 
-async fn login(stream: &mut TcpStream, players: Players) -> Option<String> {
+async fn login(telnet: &mut TelnetWrapper, players: Players) -> Option<String> {
     loop {
-        stream.write_all(b"Enter a username: ").await.unwrap();
+        telnet.write_all(b"Enter a username: ").await;
 
         let mut username_buffer = [0; 1024];
-        let bytes_read = stream.read(&mut username_buffer).await.unwrap();
 
-        if bytes_read == 0 {
-            // TODO: Other info eg IPAddress?
-            log::info!("Client disconnected during login");
-            return None;
-        }
+        if let Ok(bytes_read) = telnet.read(&mut username_buffer).await {
+            if bytes_read == 0 {
+                // TODO: Other info eg IPAddress?
+                // TODO: I don't think this is actually working right now
+                log::info!("Client disconnected during login");
+                return None;
+            }
+            let username = String::from_utf8_lossy(&username_buffer[..bytes_read])
+                .trim()
+                .to_string();
 
-        let username = String::from_utf8_lossy(&username_buffer[..bytes_read])
-            .trim()
-            .to_string();
-
-        if players
-            .read()
-            .unwrap()
-            .values()
-            .any(|p| p.username == username)
-        {
-            stream
-                .write_all(b"Username already taken. Try again.\r\n")
-                .await
-                .unwrap();
-        } else {
-            let welcome = format!("Welcome, {}\r\n", username);
-            stream.write_all(welcome.as_bytes()).await.unwrap();
-            return Some(username);
+            if players
+                .read()
+                .unwrap()
+                .values()
+                .any(|p| p.username == username)
+            {
+                telnet
+                    .write_all(b"Username already taken. Try again.\r\n")
+                    .await;
+            } else {
+                let welcome = format!("Welcome, {}\r\n", username);
+                telnet.write_all(welcome.as_bytes()).await;
+                return Some(username);
+            }
         }
     }
 }
@@ -53,9 +49,10 @@ pub async fn handle_connection(
 ) {
     // Generate a communication channel
     let (player_sender, mut player_receiver) = mpsc::unbounded_channel();
+    let mut telnet = TelnetWrapper::new(stream);
 
     // Dispatch to the login flow
-    if let Some(username) = login(&mut stream, players.clone()).await {
+    if let Some(username) = login(&mut telnet, players.clone()).await {
         // Create a new player instance
         let player = Arc::new(Player::new(username, players.clone(), player_sender));
 
@@ -70,44 +67,23 @@ pub async fn handle_connection(
         // TODO: Buffered reading?
         loop {
             tokio::select! {
-                bytes_read = stream.read(&mut buffer) => {
-                    match bytes_read {
-                        Ok(0) => {
-                            // Connection closed by remote peer
-                            log::info!("Client {} disconnected", &player.id);
-                            players.write().unwrap().remove(&player.id);
-                            return
-                        }
-                        Ok(n) => {
-                            telnet_buffer.extend_from_slice(&buffer[..n]);
+                message = read_from_buffer(&mut buffer, &mut telnet_buffer, &mut telnet) => {
+                    if let Some(bytes) = message {
+                        let message = String::from_utf8_lossy(&bytes);
+                        log::debug!(
+                            "Received message from player {}: {}",
+                            player.id,
+                            message.trim()
+                        );
 
-                            while let Some(event) = parse_telnet_event(&mut telnet_buffer) {
-                                match event {
-                                    TelnetEvent::Data(bytes) => {
-                                        let message = String::from_utf8_lossy(&bytes);
-                                        log::debug!(
-                                            "Received message from player {}: {}",
-                                            player.id,
-                                            message.trim()
-                                        );
-
-                                        // Send the raw message to the game annotated with the player ID
-                                        let raw_command = RawCommand::new(player.id, message.to_string());
-                                        game_sender.send(raw_command).await;
-                                    }
-                                    _ => {
-                                        // TODO: Figure out if we actually need to handle - wondering about 244
-                                        // (disconnect?)
-                                        log::warn!("Received unhandled TelnetEvent: {:?}", event);
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            log::error!("Error reading from stream: {}", e);
-                            players.write().unwrap().remove(&player.id);
-                            return
-                        }
+                        // Send the raw message to the game annotated with the player ID
+                        let raw_command = RawCommand::new(player.id, message.to_string());
+                        game_sender.send(raw_command).await;
+                    } else {
+                        // Remove the player from the connected players map when the connection is closed
+                        players.write().unwrap().remove(&player.id);
+                        log::info!("Player {} disconnected", player.id);
+                        return
                     }
                 }
                 game_message = player_receiver.recv() => {
@@ -121,21 +97,16 @@ pub async fn handle_connection(
                                     content
                                 );
                                 let response = format!("Gossip <{}>: {}\r\n", sending_user, content);
-                                stream.write_all(response.as_bytes()).await.unwrap();
+                                telnet.write_all(response.as_bytes()).await;
                             }
                             GameMessage::NotParsed => {
                                 let response = "Arglebargle, glop-glyf!?!?!\r\n";
-                                stream.write_all(response.as_bytes()).await.unwrap();
+                                telnet.write_all(response.as_bytes()).await;
                             }
                         }
                     }
                 }
             }
         }
-        // Remove the player from the connected players map when the connection is closed
-        players.write().unwrap().remove(&player.id);
-        log::info!("Player {} disconnected", player.id);
-    } else {
-        log::info!("Client disconnected during login");
     }
 }
