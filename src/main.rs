@@ -2,7 +2,7 @@ use log;
 use std::sync::Arc;
 use tokio::{net::TcpListener, sync::mpsc};
 
-mod action;
+mod actions;
 mod connection;
 mod game_loop;
 mod message;

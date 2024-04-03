@@ -1,4 +1,5 @@
 use crate::{
+    actions::{self, PlayerAction},
     message::{GameMessage, PlayerMessage, RawCommand},
     player::Players,
     world::World,
@@ -21,27 +22,11 @@ pub async fn read_commands(
         if let Some(player_message) = command {
             match player_message {
                 PlayerMessage::Gossip(content) => {
-                    let sending_player_username = {
-                        if let Some(sending_player) = players.read().get(&raw_command.sender()) {
-                            sending_player.username.clone()
-                        } else {
-                            continue;
-                        }
+                    let action = actions::GossipAction {
+                        sender: raw_command.sender(),
+                        content,
                     };
-
-                    log::debug!(
-                        "Received gossip from player: {} - {}",
-                        sending_player_username,
-                        content.trim()
-                    );
-
-                    for player in players.read().values() {
-                        log::debug!("Sending gossip to player {}", player.username);
-                        player.game_message(GameMessage::Gossip(
-                            content.clone(),
-                            sending_player_username.clone(),
-                        ));
-                    }
+                    action.perform(&players, &world);
                 }
                 PlayerMessage::Look => {
                     if let Some(sending_player) = players.write().get_mut(&raw_command.sender()) {

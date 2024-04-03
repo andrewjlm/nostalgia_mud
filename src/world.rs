@@ -3,6 +3,10 @@ use std::collections::HashMap;
 use crate::player::Player;
 use crate::room::{get_sample_rooms, Room};
 
+// TODO: We might want to do something similar to what we did to the Players struct in terms of
+// making it a wrapper around an Arc/RwLock. That is, if we ever need something other than the game
+// loop to update the world. One example could be if we make the `tick` function do stuff to the
+// world.
 pub struct World {
     rooms: HashMap<u32, Room>,
 }
