@@ -20,6 +20,9 @@ pub async fn read_commands(
         let command = raw_command.interpret();
 
         if let Some(player_message) = command {
+            // TODO: Could we further standardize the interface? Make every action take a sender
+            // and a list of arguments, then somehow do a lookup to a function in a HashMap or
+            // something?
             match player_message {
                 PlayerMessage::Gossip(content) => {
                     let action = actions::GossipAction {
@@ -29,16 +32,10 @@ pub async fn read_commands(
                     action.perform(&players, &world);
                 }
                 PlayerMessage::Look => {
-                    if let Some(sending_player) = players.write().get_mut(&raw_command.sender()) {
-                        log::debug!("Received look from player: {}", sending_player.username);
-                        // TODO: Again, what if they're in a non-existent room or something
-                        if let Some(room) = world.get_player_room(&sending_player) {
-                            sending_player.game_message(GameMessage::Look(format!(
-                                "{}\n{}",
-                                room.name, room.description
-                            )));
-                        }
-                    }
+                    let action = actions::LookAction {
+                        sender: raw_command.sender(),
+                    };
+                    action.perform(&players, &world);
                 }
                 PlayerMessage::Move(direction) => {
                     let action = actions::MoveAction {

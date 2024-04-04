@@ -85,7 +85,7 @@ pub async fn handle_connection(
 
                             // Send the raw message to the game annotated with the player ID
                             let raw_command = RawCommand::new(player.id, message.to_string());
-                            game_sender.send(raw_command).await;
+                            let _ = game_sender.send(raw_command).await;
                         } else {
                             // Remove the player from the connected players map when the connection is closed
                             players.write().remove(&player.id);

@@ -31,7 +31,7 @@ impl Player {
     }
 
     pub fn game_message(&self, message: GameMessage) {
-        self.sender.send(message);
+        let _ = self.sender.send(message);
     }
 
     pub fn move_to_room(&mut self, room_id: u32) {
