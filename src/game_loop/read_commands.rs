@@ -41,33 +41,11 @@ pub async fn read_commands(
                     }
                 }
                 PlayerMessage::Move(direction) => {
-                    if let Some(sending_player) = players.write().get_mut(&raw_command.sender()) {
-                        log::debug!(
-                            "Received move from player: {} - {:?}",
-                            sending_player.username,
-                            direction
-                        );
-
-                        if let Some(exit) = world
-                            .get_player_room(&sending_player)
-                            .and_then(|player_room| player_room.get_exit(&direction.to_string()))
-                        {
-                            log::debug!("Moving player {} to {}", direction, exit);
-                            sending_player.move_to_room(*exit);
-                            // TODO: There is probably some better way to architect so that "Look"
-                            // logic is only written once
-                            if let Some(room) = world.get_player_room(&sending_player) {
-                                sending_player.game_message(GameMessage::Look(format!(
-                                    "{}\n{}",
-                                    room.name, room.description
-                                )));
-                            }
-                            // TODO: Make configurable if we send the full room or a "glance" (just
-                            // the room name and exits)
-                        } else {
-                            sending_player.game_message(GameMessage::NoExit(direction));
-                        }
-                    }
+                    let action = actions::MoveAction {
+                        sender: raw_command.sender(),
+                        direction,
+                    };
+                    action.perform(&players, &world);
                 }
                 PlayerMessage::Contextual(command, arguments) => {
                     log::debug!(

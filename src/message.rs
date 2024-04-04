@@ -58,7 +58,7 @@ impl RawCommand {
 }
 
 // Room exits that we explicitly check for
-#[derive(Debug, strum_macros::Display)]
+#[derive(Debug, strum_macros::Display, Clone, Copy)]
 #[strum(serialize_all = "lowercase")]
 pub enum Direction {
     North,
