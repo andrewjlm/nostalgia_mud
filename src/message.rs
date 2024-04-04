@@ -93,7 +93,7 @@ pub enum PlayerMessage {
 }
 
 // Messages that the game loop can send to connections
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum GameMessage {
     // Global Chat
     Gossip(String, String),
@@ -101,4 +101,31 @@ pub enum GameMessage {
     Look(String),
     NoExit(Direction),
     NotParsed,
+}
+
+impl GameMessage {
+    pub fn to_response(&self) -> String {
+        match self {
+            GameMessage::Gossip(content, sending_user) => {
+                format!("Gossip <{}>: {}\r\n", sending_user, content)
+            }
+            GameMessage::Say(content, sending_user) => {
+                format!("Say <{}>: {}\r\n", sending_user, content)
+            }
+            GameMessage::Look(description) => {
+                format!("{}\r\n", description)
+            }
+            GameMessage::NotParsed => String::from("Arglebargle, glop-glyf!?!?!\r\n"),
+            GameMessage::NoExit(direction) => {
+                // TODO: This will read sort of awkward (eg "You don't see an
+                // exit north from here" when we'd probably say "north of
+                // here"). Should figure out a way to get consistent.
+                format!("You don't see an exit {} from here\r\n", direction)
+            }
+        }
+    }
+
+    pub fn to_bytes_response(&self) -> Vec<u8> {
+        self.to_response().into_bytes()
+    }
 }

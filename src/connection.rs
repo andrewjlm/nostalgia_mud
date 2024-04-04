@@ -95,50 +95,8 @@ pub async fn handle_connection(
                     }
                     game_message = player_receiver.recv() => {
                         if let Some(message) = game_message {
-                            match message {
-                                // TODO: Some low hanging fruit for consolidation here, just match and
-                                // return the response then write at the end (if we get one)
-                                GameMessage::Gossip(content, sending_user) => {
-                                    log::debug!(
-                                        "Player {} received gossip from game: {} - {}",
-                                        player.id,
-                                        sending_user,
-                                        content
-                                    );
-                                    let response = format!("Gossip <{}>: {}\r\n", sending_user, content);
-                                    telnet.write_all(response.as_bytes()).await;
-                                }
-                                GameMessage::Say(content, sending_user) => {
-                                    log::debug!(
-                                        "Player {} received say from game: {} - {}",
-                                        player.id,
-                                        sending_user,
-                                        content
-                                    );
-                                    let response = format!("Say <{}>: {}\r\n", sending_user, content);
-                                    telnet.write_all(response.as_bytes()).await;
-                                }
-                                GameMessage::Look(description) => {
-                                    log::debug!(
-                                        "Player {} looked, saw {}",
-                                        player.id,
-                                        description
-                                        );
-                                    let response = format!("{}\r\n", description);
-                                    telnet.write_all(response.as_bytes()).await;
-                                }
-                                GameMessage::NotParsed => {
-                                    let response = "Arglebargle, glop-glyf!?!?!\r\n";
-                                    telnet.write_all(response.as_bytes()).await;
-                                }
-                                GameMessage::NoExit(direction) => {
-                                    // TODO: This will read sort of awkward (eg "You don't see an
-                                    // exit north from here" when we'd probably say "north of
-                                    // here"). Should figure out a way to get consistent.
-                                    let response = format!("You don't see an exit {} from here\r\n", direction);
-                                    telnet.write_all(response.as_bytes()).await;
-                                }
-                            }
+                            log::debug!("Player {} received game message {:?}", player.id, message);
+                            telnet.write_all(&message.to_bytes_response()).await;
                         }
                     }
                 }
