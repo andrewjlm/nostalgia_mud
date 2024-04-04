@@ -11,9 +11,23 @@ impl PlayerAction for LookAction {
             log::debug!("Received look from player: {}", sending_player.username);
             // TODO: Again, what if they're in a non-existent room or something
             if let Some(room) = world.get_player_room(&sending_player) {
+                let exits = {
+                    if room.exits.is_empty() {
+                        String::from("You don't see any exits.")
+                    } else {
+                        let exits_list = room
+                            .exits
+                            .keys()
+                            .map(String::as_str)
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        format!("You see exits to the {}", exits_list)
+                    }
+                };
+
                 sending_player.game_message(GameMessage::Look(format!(
-                    "{}\n{}",
-                    room.name, room.description
+                    "{}\n{}\n{}",
+                    room.name, room.description, exits
                 )));
             }
         }

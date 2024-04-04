@@ -45,11 +45,16 @@ pub async fn read_commands(
                     action.perform(&players, &world);
                 }
                 PlayerMessage::Move(direction) => {
-                    let action = actions::MoveAction {
+                    let move_action = actions::MoveAction {
                         sender: raw_command.sender(),
                         direction,
                     };
-                    action.perform(&players, &world);
+                    // TODO: Make this optional
+                    let look_action = actions::LookAction {
+                        sender: raw_command.sender(),
+                    };
+                    move_action.perform(&players, &world);
+                    look_action.perform(&players, &world);
                 }
                 PlayerMessage::Contextual(command, arguments) => {
                     log::debug!(

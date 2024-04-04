@@ -11,6 +11,10 @@ pub struct Player {
     // Sender for sending GameMessages to the player
     sender: mpsc::UnboundedSender<GameMessage>,
     // The player's current room
+    // TODO: Should this be a reference? Makes things a mess but some things might only be possible
+    // with it. In particular, I'm wondering if there is some sort of "Area" chat (Yell?). To use
+    // our predicate channel creation, we'd need to know all the other players in the area. Not
+    // that we have areas yet...
     pub current_room: u32,
 }
 
