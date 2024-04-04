@@ -82,6 +82,7 @@ pub enum PlayerMessage {
 }
 
 // Messages that the game loop can send to connections
+#[derive(Clone)]
 pub enum GameMessage {
     // Global Chat
     Gossip(String, String),

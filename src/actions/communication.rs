@@ -1,4 +1,9 @@
-use crate::{actions::PlayerAction, message::GameMessage, player::Players, world::World};
+use crate::{
+    actions::PlayerAction,
+    message::GameMessage,
+    player::{Player, Players},
+    world::World,
+};
 
 pub struct GossipAction {
     pub sender: u32,
@@ -22,10 +27,23 @@ impl PlayerAction for GossipAction {
             self.content.trim()
         );
 
-        for player in players.read().values() {
-            let message =
-                GameMessage::Gossip(self.content.clone(), sending_player_username.clone());
-            player.game_message(message);
-        }
+        send_targeted_message(
+            players,
+            GameMessage::Gossip(self.content.clone(), sending_player_username.clone()),
+            // Send to everyone so don't bother with a real predicate
+            |_| true,
+        );
+    }
+}
+
+// Utility function to send a message to some subset of players
+// TODO: Should this be even more generic - use outside of player communications?
+fn send_targeted_message<F>(players: &Players, message: GameMessage, predicate: F)
+where
+    F: FnMut(&(&u32, &Player)) -> bool,
+{
+    for (_id, player) in players.read().iter().filter(predicate) {
+        let message = message.clone();
+        player.game_message(message);
     }
 }
