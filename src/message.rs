@@ -31,6 +31,15 @@ impl RawCommand {
                             Some(PlayerMessage::Gossip(rest.to_string()))
                         }
                     }
+                    "say" => {
+                        let rest = parts.collect::<Vec<_>>().join(" ");
+                        if rest.is_empty() {
+                            //TODO: Should this alert somehow?
+                            None
+                        } else {
+                            Some(PlayerMessage::Say(rest.to_string()))
+                        }
+                    }
                     "l" | "look" => {
                         // TODO: Right now this is just a generic 'look' command for the current
                         // room but ultimately it should allow you to look at specific things as
@@ -73,6 +82,8 @@ pub enum Direction {
 pub enum PlayerMessage {
     // Global Chat
     Gossip(String),
+    // Room Chat
+    Say(String),
     // Look
     Look,
     // Possible Contextual command w/ Arguments
@@ -86,6 +97,7 @@ pub enum PlayerMessage {
 pub enum GameMessage {
     // Global Chat
     Gossip(String, String),
+    Say(String, String),
     Look(String),
     NoExit(Direction),
     NotParsed,

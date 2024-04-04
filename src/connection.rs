@@ -108,6 +108,16 @@ pub async fn handle_connection(
                                     let response = format!("Gossip <{}>: {}\r\n", sending_user, content);
                                     telnet.write_all(response.as_bytes()).await;
                                 }
+                                GameMessage::Say(content, sending_user) => {
+                                    log::debug!(
+                                        "Player {} received say from game: {} - {}",
+                                        player.id,
+                                        sending_user,
+                                        content
+                                    );
+                                    let response = format!("Say <{}>: {}\r\n", sending_user, content);
+                                    telnet.write_all(response.as_bytes()).await;
+                                }
                                 GameMessage::Look(description) => {
                                     log::debug!(
                                         "Player {} looked, saw {}",

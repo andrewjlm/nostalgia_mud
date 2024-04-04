@@ -31,6 +31,13 @@ pub async fn read_commands(
                     };
                     action.perform(&players, &world);
                 }
+                PlayerMessage::Say(content) => {
+                    let action = actions::SayAction {
+                        sender: raw_command.sender(),
+                        content,
+                    };
+                    action.perform(&players, &world);
+                }
                 PlayerMessage::Look => {
                     let action = actions::LookAction {
                         sender: raw_command.sender(),
