@@ -5,12 +5,14 @@ use crate::{
     world::World,
 };
 
+#[derive(Debug)]
 pub struct GossipAction {
     pub sender: u32,
     pub content: String,
 }
 
 impl PlayerAction for GossipAction {
+    #[tracing::instrument(skip(players, _world), fields(username=tracing::field::Empty))]
     fn perform(&self, players: &Players, _world: &World) {
         // Do all the reading from the players map at once
         let sending_player_username = {
@@ -20,12 +22,9 @@ impl PlayerAction for GossipAction {
                 return;
             }
         };
+        tracing::Span::current().record("username", &sending_player_username);
 
-        log::debug!(
-            "Received gossip from player: {} - {}",
-            sending_player_username,
-            self.content.trim()
-        );
+        tracing::debug!("Performing Gossip: '{}'", self.content.trim());
 
         send_targeted_message(
             players,
@@ -38,12 +37,14 @@ impl PlayerAction for GossipAction {
 
 // TODO Further opportunities for consolidation? Everything in here (except Tell) will be the same
 // stuff with a different predicate and GameMessage type
+#[derive(Debug)]
 pub struct SayAction {
     pub sender: u32,
     pub content: String,
 }
 
 impl PlayerAction for SayAction {
+    #[tracing::instrument(skip(players, _world), fields(username=tracing::field::Empty))]
     fn perform(&self, players: &Players, _world: &World) {
         // Do all the reading from the players map at once
         let (sending_player_username, room) = {
@@ -53,13 +54,9 @@ impl PlayerAction for SayAction {
                 return;
             }
         };
+        tracing::Span::current().record("username", &sending_player_username);
 
-        log::debug!(
-            "Received say from player: (Room {}): {} - {}",
-            room,
-            sending_player_username,
-            self.content.trim()
-        );
+        tracing::debug!("Performing Say: '{}'", self.content.trim());
 
         send_targeted_message(
             players,
@@ -72,11 +69,15 @@ impl PlayerAction for SayAction {
 
 // Utility function to send a message to some subset of players
 // TODO: Should this be even more generic - use outside of player communications?
+// TODO: It might be useful to be able to trace the predicates being called
+// https://boydjohnson.dev/blog/impl-debug-for-fn-type/
+#[tracing::instrument(skip(players, predicate))]
 fn send_targeted_message<F>(players: &Players, message: GameMessage, predicate: F)
 where
     F: FnMut(&(&u32, &Player)) -> bool,
 {
     for (_id, player) in players.read().iter().filter(predicate) {
+        tracing::debug!("Sending to {}", player.username);
         let message = message.clone();
         player.game_message(message);
     }

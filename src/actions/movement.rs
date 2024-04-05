@@ -5,6 +5,7 @@ use crate::{
     world::World,
 };
 
+#[derive(Debug)]
 pub struct MoveAction {
     pub sender: u32,
     pub direction: Direction,
@@ -18,7 +19,7 @@ impl PlayerAction for MoveAction {
                 .get_player_room(&sending_player)
                 .and_then(|player_room| player_room.get_exit(&self.direction.to_string()))
             {
-                log::debug!("Moving player {} to {}", &self.direction, exit);
+                tracing::debug!("Moving player {} to {}", &self.direction, exit);
                 sending_player.move_to_room(*exit);
             } else {
                 sending_player.game_message(GameMessage::NoExit(self.direction));

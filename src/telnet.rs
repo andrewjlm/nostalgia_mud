@@ -1,4 +1,3 @@
-use log::warn;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -51,7 +50,7 @@ pub fn parse_telnet_event(buffer: &mut Vec<u8>) -> Option<TelnetEvent> {
             }
             // If we get command bytes as the first byte... throw a warning?
             BYTE_NOP | BYTE_SB | BYTE_SE | BYTE_WILL | BYTE_WONT | BYTE_DO | BYTE_DONT => {
-                warn!("Telnet command started with command byte {:?}", byte);
+                tracing::warn!("Telnet command started with command byte {:?}", byte);
                 None
             }
             _ => {
@@ -71,6 +70,10 @@ pub struct TelnetWrapper {
 impl TelnetWrapper {
     pub fn new(stream: TcpStream) -> Self {
         TelnetWrapper { stream }
+    }
+
+    pub fn peer_addr(&self) -> tokio::io::Result<std::net::SocketAddr> {
+        self.stream.peer_addr()
     }
 
     pub async fn read(&mut self, buf: &mut [u8]) -> tokio::io::Result<usize> {
@@ -103,7 +106,7 @@ pub async fn read_from_buffer(
                 match event {
                     TelnetEvent::Data(bytes) => Some(bytes.to_vec()),
                     _ => {
-                        log::warn!("Received unhandled TelnetEvent: {:?}", event);
+                        tracing::warn!("Received unhandled TelnetEvent: {:?}", event);
                         None
                     }
                 }
@@ -112,7 +115,7 @@ pub async fn read_from_buffer(
             }
         }
         Err(e) => {
-            log::error!("Error reading from stream: {}", e);
+            tracing::error!("Error reading from stream: {}", e);
             None
         }
     }

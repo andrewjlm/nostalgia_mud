@@ -8,12 +8,13 @@ mod tick;
 use read_commands::read_commands;
 use tick::tick;
 
+#[tracing::instrument(skip_all)]
 pub async fn game_loop(
     players: Players,
     world: Arc<World>,
     mut receiver: mpsc::Receiver<RawCommand>,
 ) {
-    log::info!("Game loop spawned");
+    tracing::info!("Game loop spawned");
     loop {
         tokio::select! {
             _game_clock = tick() => {},

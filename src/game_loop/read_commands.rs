@@ -16,6 +16,8 @@ pub async fn read_commands(
     // Update game state, send messages to players, etc.
     // Access players map using players.read().unwrap()
     while let Some(raw_command) = receiver.recv().await {
+        let _span = tracing::debug_span!("read_commands", sender = raw_command.sender()).entered();
+
         // Interpret the command
         let command = raw_command.interpret();
 
@@ -57,8 +59,8 @@ pub async fn read_commands(
                     look_action.perform(&players, &world);
                 }
                 PlayerMessage::Contextual(command, arguments) => {
-                    log::debug!(
-                        "Failed to parse potential contextual player message: {} - {}",
+                    tracing::debug!(
+                        "Failed to parse potential contextual player message: {} {}",
                         command,
                         arguments
                     );
@@ -69,7 +71,7 @@ pub async fn read_commands(
             }
         } else {
             if let Some(sending_player) = players.read().get(&raw_command.sender()) {
-                log::debug!("Failed to parse player message: {:?}", raw_command);
+                tracing::debug!("Failed to parse player message: {:?}", raw_command);
                 sending_player.game_message(GameMessage::NotParsed);
             }
         }

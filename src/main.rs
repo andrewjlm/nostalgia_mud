@@ -20,10 +20,10 @@ use game_loop::game_loop;
 #[tokio::main]
 async fn main() {
     // Start logging
-    env_logger::init();
+    let subscriber = tracing_subscriber::fmt::init();
 
     let listener = TcpListener::bind("127.0.0.1:4073").await.unwrap();
-    log::info!("Telnet server started on localhost:4073");
+    tracing::info!("Telnet server started on localhost:4073");
 
     let players = player::Players::new();
     let world = Arc::new(world::get_sample_world());

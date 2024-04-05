@@ -38,10 +38,13 @@ impl Player {
         let _ = self.sender.send(message);
     }
 
+    #[tracing::instrument(skip_all,
+                          fields(username = self.username,
+                                 previous = self.current_room, new = room_id))]
     pub fn move_to_room(&mut self, room_id: u32) {
         // TODO: The player should get something sent when they enter a new room. This is probably
         // configurable - you either get a quick summary of where you are or a full "look"
-        log::debug!("Player {} moved to {}", self.username, room_id);
+        tracing::debug!("Player moved rooms");
         self.current_room = room_id;
     }
 }

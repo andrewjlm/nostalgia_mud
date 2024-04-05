@@ -1,9 +1,8 @@
 use crate::{
-    message::{GameMessage, RawCommand},
+    message::RawCommand,
     player::{Player, Players},
     telnet::{read_from_buffer, TelnetWrapper},
 };
-use log;
 use tokio::{net::TcpStream, sync::mpsc};
 
 async fn login(telnet: &mut TelnetWrapper, players: &Players) -> Option<String> {
@@ -14,20 +13,22 @@ async fn login(telnet: &mut TelnetWrapper, players: &Players) -> Option<String> 
 
         if let Ok(bytes_read) = telnet.read(&mut username_buffer).await {
             if bytes_read == 0 {
-                // TODO: Other info eg IPAddress?
-                // TODO: I don't think this is actually working right now
-                log::info!("Client disconnected during login");
+                tracing::info!("Client disconnected during login");
                 return None;
             }
+            // TODO: We should do some validation here, don't let people have "bad" names for
+            // various definitions of "bad"
             let username = String::from_utf8_lossy(&username_buffer[..bytes_read])
                 .trim()
                 .to_string();
 
             if players.read().values().any(|p| p.username == username) {
+                tracing::info!("Client attempted to use existing username {}", username);
                 telnet
                     .write_all(b"Username already taken. Try again.\r\n")
                     .await;
             } else {
+                tracing::info!("Welcoming new player {}", username);
                 let welcome = format!("Welcome, {}\r\n", username);
                 telnet.write_all(welcome.as_bytes()).await;
                 return Some(username);
@@ -36,6 +37,9 @@ async fn login(telnet: &mut TelnetWrapper, players: &Players) -> Option<String> 
     }
 }
 
+#[tracing::instrument(skip_all,
+                      fields(peer_addr = %stream.peer_addr().unwrap(),
+                      username = tracing::field::Empty),)]
 pub async fn handle_connection(
     players: Players,
     stream: TcpStream,
@@ -45,8 +49,13 @@ pub async fn handle_connection(
     let (player_sender, mut player_receiver) = mpsc::unbounded_channel();
     let mut telnet = TelnetWrapper::new(stream);
 
+    tracing::info!("Client connected");
+
     // Dispatch to the login flow
     if let Some(username) = login(&mut telnet, &players).await {
+        // Start logging events with the player name after login
+        tracing::Span::current().record("username", &username);
+
         // Create a new player instance
         // TODO: Right now everyone ALWAYS starts in the same room. Also, if Room 1 doesn't
         // exist... not sure what happens but presumably bad
@@ -57,8 +66,6 @@ pub async fn handle_connection(
 
         // Add the player to the connected players map
         players.write().insert(player_id, player.clone());
-
-        log::info!("New player connected: {:?}", player.username);
 
         let mut buffer = [0; 1024];
         let mut telnet_buffer = Vec::new();
@@ -77,11 +84,7 @@ pub async fn handle_connection(
                     message = read_from_buffer(&mut buffer, &mut telnet_buffer, &mut telnet) => {
                         if let Some(bytes) = message {
                             let message = String::from_utf8_lossy(&bytes);
-                            log::debug!(
-                                "Received message from player {}: {}",
-                                player.id,
-                                message.trim()
-                            );
+                            tracing::trace!("Received message '{}'", message.trim());
 
                             // Send the raw message to the game annotated with the player ID
                             let raw_command = RawCommand::new(player.id, message.to_string());
@@ -89,13 +92,13 @@ pub async fn handle_connection(
                         } else {
                             // Remove the player from the connected players map when the connection is closed
                             players.write().remove(&player.id);
-                            log::info!("Player {} disconnected", player.id);
+                            tracing::info!("Player disconnected");
                             return
                         }
                     }
                     game_message = player_receiver.recv() => {
                         if let Some(message) = game_message {
-                            log::debug!("Player {} received game message {:?}", player.id, message);
+                            tracing::trace!("Sent message '{:?}'", message);
                             telnet.write_all(&message.to_bytes_response()).await;
                         }
                     }
