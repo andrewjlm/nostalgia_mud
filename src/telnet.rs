@@ -77,10 +77,15 @@ impl TelnetWrapper {
     }
 
     pub async fn read(&mut self, buf: &mut [u8]) -> tokio::io::Result<usize> {
+        // NOTE: This is ok to use at the base of our select statement since it's cancel safe
+        // https://docs.rs/tokio/latest/tokio/io/trait.AsyncReadExt.html#cancel-safety
         self.stream.read(buf).await
     }
 
     pub async fn write_all(&mut self, src: &[u8]) {
+        // NOTE: THIS IS NOT CANCEL safe
+        // https://docs.rs/tokio/latest/tokio/io/trait.AsyncWriteExt.html#method.write_all
+        // TODO: Is this an issue in practice?
         self.stream.write_all(src).await.unwrap();
     }
 

@@ -19,6 +19,8 @@ use game_loop::game_loop;
 
 #[tokio::main]
 async fn main() {
+    // TODO: Implement shutdown via ctrl-c or a command from a wiz
+    // https://tokio.rs/tokio/topics/shutdown
     // Start logging
     let subscriber = tracing_subscriber::fmt::init();
 
