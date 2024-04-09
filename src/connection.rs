@@ -1,41 +1,19 @@
 use crate::{
-    message::RawCommand,
+    message::ConnectionMessage,
     player::{Player, Players},
-    telnet::{read_from_buffer, TelnetWrapper},
 };
 use tokio::{net::TcpStream, sync::mpsc};
 
-async fn login(telnet: &mut TelnetWrapper, players: &Players) -> Option<String> {
-    loop {
-        telnet.write_all(b"Enter a username: ").await;
+use tokio_stream::StreamExt;
+use tokio_util::codec::Framed;
 
-        let mut username_buffer = [0; 1024];
+use futures::SinkExt;
 
-        if let Ok(bytes_read) = telnet.read(&mut username_buffer).await {
-            if bytes_read == 0 {
-                tracing::info!("Client disconnected during login");
-                return None;
-            }
-            // TODO: We should do some validation here, don't let people have "bad" names for
-            // various definitions of "bad"
-            let username = String::from_utf8_lossy(&username_buffer[..bytes_read])
-                .trim()
-                .to_string();
+mod login;
+use login::login_prompt;
 
-            if players.read().values().any(|p| p.username == username) {
-                tracing::info!("Client attempted to use existing username {}", username);
-                telnet
-                    .write_all(b"Username already taken. Try again.\r\n")
-                    .await;
-            } else {
-                tracing::info!("Welcoming new player {}", username);
-                let welcome = format!("Welcome, {}\r\n", username);
-                telnet.write_all(welcome.as_bytes()).await;
-                return Some(username);
-            }
-        }
-    }
-}
+mod telnet_codec;
+use telnet_codec::{Prompt, TelnetCodec};
 
 #[tracing::instrument(skip_all,
                       fields(peer_addr = %stream.peer_addr().unwrap(),
@@ -43,69 +21,57 @@ async fn login(telnet: &mut TelnetWrapper, players: &Players) -> Option<String> 
 pub async fn handle_connection(
     players: Players,
     stream: TcpStream,
-    game_sender: mpsc::Sender<RawCommand>,
+    game_sender: mpsc::Sender<ConnectionMessage>,
 ) {
     // Generate a communication channel
     let (player_sender, mut player_receiver) = mpsc::unbounded_channel();
-    let mut telnet = TelnetWrapper::new(stream);
+
+    // Setup a Framed LinesCodec to read/write lines to/from the connection
+    // TODO: with_max_length so we don't get blasted
+    let mut telnet = Framed::new(stream, TelnetCodec::new());
 
     tracing::info!("Client connected");
 
     // Dispatch to the login flow
-    if let Some(username) = login(&mut telnet, &players).await {
+    if let Ok(Some(username)) = login_prompt(&mut telnet, &players).await {
         // Start logging events with the player name after login
         tracing::Span::current().record("username", &username);
 
-        // Create a new player instance
+        // Create a new player instance and send it to the game_loop to add to the list of current
+        // players
         // TODO: Right now everyone ALWAYS starts in the same room. Also, if Room 1 doesn't
         // exist... not sure what happens but presumably bad
         let player = Player::new(username, &players, player_sender, 1);
-
-        // Reserve a copy of the ID for retrieval
+        // Reserve a copy of the ID for downstream usage
         let player_id = player.id;
+        let create_player_command = ConnectionMessage::AddPlayer(player);
+        let _ = game_sender.send(create_player_command).await;
 
-        // Add the player to the connected players map
-        players.write().insert(player_id, player.clone());
-
-        let mut buffer = [0; 1024];
-        let mut telnet_buffer = Vec::new();
-
-        // TODO: Buffered reading?
         loop {
-            // NOTE: Once we have the player in the RwLocked HashMap, we should never use the
-            // *original* player so we retrieve it here
-            let player = {
-                let players_guard = players.read();
-                players_guard.get(&player_id).cloned()
-            };
-
-            if let Some(player) = player {
-                tokio::select! {
-                    message = read_from_buffer(&mut buffer, &mut telnet_buffer, &mut telnet) => {
-                        if let Some(bytes) = message {
-                            let message = String::from_utf8_lossy(&bytes);
-                            tracing::trace!("Received message '{}'", message.trim());
-
-                            // Send the raw message to the game annotated with the player ID
-                            let raw_command = RawCommand::new(player.id, message.to_string());
-                            let _ = game_sender.send(raw_command).await;
-                        } else {
-                            // Remove the player from the connected players map when the connection is closed
-                            players.write().remove(&player.id);
+            // Once the connection is established, send/receive messages from the player
+            tokio::select! {
+                read_line = telnet.next() => {
+                    match read_line {
+                        Some(Ok(message)) => {
+                            // If we get a message from the client, send it to the server as a
+                            // potential command to process, annotated with the sender id
+                            let _ = game_sender.send(ConnectionMessage::PlayerCommand(player_id, message)).await;
+                        }
+                        _ => {
+                            // Otherwise, the client has disconnected and we'll remove them from
+                            // the active players list
                             tracing::info!("Player disconnected");
+                            let _ = game_sender.send(ConnectionMessage::RemovePlayer(player_id)).await;
                             return
                         }
                     }
-                    game_message = player_receiver.recv() => {
-                        if let Some(message) = game_message {
-                            tracing::trace!("Sent message '{:?}'", message);
-                            telnet.write_all(&message.to_bytes_response()).await;
-                        }
+                }
+                game_message = player_receiver.recv() => {
+                    if let Some(message) = game_message {
+                        // If we get a message from the server, send it to the client
+                        let _ = telnet.send(&message.to_response()).await;
                     }
                 }
-            } else {
-                // Player not found, exit the loop
-                break;
             }
         }
     }

@@ -1,4 +1,3 @@
-use log;
 use std::sync::Arc;
 use tokio::{net::TcpListener, sync::mpsc};
 
@@ -8,7 +7,6 @@ mod game_loop;
 mod message;
 mod player;
 mod room;
-mod telnet;
 mod world;
 
 use connection::handle_connection;

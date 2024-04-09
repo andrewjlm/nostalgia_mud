@@ -1,3 +1,13 @@
+use crate::player::Player;
+
+pub enum ConnectionMessage {
+    // Control messages for adding and removing players
+    AddPlayer(Player),
+    RemovePlayer(u32),
+    // A message from a player that we need to handle in the game logic
+    PlayerCommand(u32, String),
+}
+
 #[derive(Debug)]
 pub struct RawCommand {
     sender_id: u32,
@@ -107,25 +117,21 @@ impl GameMessage {
     pub fn to_response(&self) -> String {
         match self {
             GameMessage::Gossip(content, sending_user) => {
-                format!("Gossip <{}>: {}\r\n", sending_user, content)
+                format!("Gossip <{}>: {}", sending_user, content)
             }
             GameMessage::Say(content, sending_user) => {
-                format!("Say <{}>: {}\r\n", sending_user, content)
+                format!("Say <{}>: {}", sending_user, content)
             }
             GameMessage::Look(description) => {
-                format!("{}\r\n", description)
+                format!("{}", description)
             }
-            GameMessage::NotParsed => String::from("Arglebargle, glop-glyf!?!?!\r\n"),
+            GameMessage::NotParsed => String::from("Arglebargle, glop-glyf!?!?!"),
             GameMessage::NoExit(direction) => {
                 // TODO: This will read sort of awkward (eg "You don't see an
                 // exit north from here" when we'd probably say "north of
                 // here"). Should figure out a way to get consistent.
-                format!("You don't see an exit {} from here\r\n", direction)
+                format!("You don't see an exit {} from here", direction)
             }
         }
-    }
-
-    pub fn to_bytes_response(&self) -> Vec<u8> {
-        self.to_response().into_bytes()
     }
 }

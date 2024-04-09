@@ -1,4 +1,4 @@
-use crate::{message::RawCommand, player::Players, world::World};
+use crate::{message::ConnectionMessage, player::Players, world::World};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -12,7 +12,7 @@ use tick::tick;
 pub async fn game_loop(
     players: Players,
     world: Arc<World>,
-    mut receiver: mpsc::Receiver<RawCommand>,
+    mut receiver: mpsc::Receiver<ConnectionMessage>,
 ) {
     tracing::info!("Game loop spawned");
     loop {
