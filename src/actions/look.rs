@@ -26,10 +26,8 @@ impl PlayerAction for LookAction {
                     }
                 };
 
-                sending_player.game_message(GameMessage::Look(format!(
-                    "{}\n{}\n{}",
-                    room.name, room.description, exits
-                )));
+                sending_player
+                    .game_message(format!("{}\n{}\n{}", room.name, room.description, exits));
             }
         }
     }

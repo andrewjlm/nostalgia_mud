@@ -9,7 +9,7 @@ pub struct Player {
     pub id: u32,
     pub username: String,
     // Sender for sending GameMessages to the player
-    sender: mpsc::UnboundedSender<GameMessage>,
+    sender: mpsc::UnboundedSender<String>,
     // The player's current room
     // TODO: Should this be a reference? Makes things a mess but some things might only be possible
     // with it. In particular, I'm wondering if there is some sort of "Area" chat (Yell?). To use
@@ -22,7 +22,7 @@ impl Player {
     pub fn new(
         username: String,
         players: &Players,
-        sender: mpsc::UnboundedSender<GameMessage>,
+        sender: mpsc::UnboundedSender<String>,
         starting_room: u32,
     ) -> Player {
         let player_id = generate_player_id(players);
@@ -34,7 +34,7 @@ impl Player {
         }
     }
 
-    pub fn game_message(&self, message: GameMessage) {
+    pub fn game_message(&self, message: String) {
         let _ = self.sender.send(message);
     }
 
@@ -66,13 +66,6 @@ impl Players {
     pub fn write(&self) -> RwLockWriteGuard<HashMap<u32, Player>> {
         self.0.write().unwrap()
     }
-    // pub fn read(&self) -> impl std::ops::Deref<Target = HashMap<u32, Player>> + '_ {
-    //self.0.read().unwrap().clone()
-    //}
-
-    // pub fn write(&self) -> impl std::ops::DerefMut<Target = HashMap<u32, Player>> + '_ {
-    // self.0.write().unwrap().clone()
-    // }
 }
 
 // TODO: Make this a method or associated function on Player?

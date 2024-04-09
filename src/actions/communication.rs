@@ -28,7 +28,7 @@ impl PlayerAction for GossipAction {
 
         send_targeted_message(
             players,
-            GameMessage::Gossip(self.content.clone(), sending_player_username.clone()),
+            format!("Gossip <{}>: {}", sending_player_username, self.content),
             // Send to everyone so don't bother with a real predicate
             |_| true,
         );
@@ -60,7 +60,7 @@ impl PlayerAction for SayAction {
 
         send_targeted_message(
             players,
-            GameMessage::Say(self.content.clone(), sending_player_username.clone()),
+            format!("Say <{}>: {}", sending_player_username, self.content),
             // Send to everyone so don't bother with a real predicate
             |&(_, player)| player.current_room == room,
         );
@@ -72,7 +72,7 @@ impl PlayerAction for SayAction {
 // TODO: It might be useful to be able to trace the predicates being called
 // https://boydjohnson.dev/blog/impl-debug-for-fn-type/
 #[tracing::instrument(skip(players, predicate))]
-fn send_targeted_message<F>(players: &Players, message: GameMessage, predicate: F)
+fn send_targeted_message<F>(players: &Players, message: String, predicate: F)
 where
     F: FnMut(&(&u32, &Player)) -> bool,
 {

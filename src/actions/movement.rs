@@ -1,9 +1,4 @@
-use crate::{
-    actions::PlayerAction,
-    message::{Direction, GameMessage},
-    player::Players,
-    world::World,
-};
+use crate::{actions::PlayerAction, message::Direction, player::Players, world::World};
 
 #[derive(Debug)]
 pub struct MoveAction {
@@ -22,7 +17,11 @@ impl PlayerAction for MoveAction {
                 tracing::debug!("Moving player {} to {}", &self.direction, exit);
                 sending_player.move_to_room(*exit);
             } else {
-                sending_player.game_message(GameMessage::NoExit(self.direction));
+                // TODO: This will read sort of awkward (eg "You don't see an
+                // exit north from here" when we'd probably say "north of
+                // here"). Should figure out a way to get consistent.
+                let response = format!("You don't see an exit {} from here", self.direction);
+                sending_player.game_message(response);
             }
         }
     }

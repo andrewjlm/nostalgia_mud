@@ -75,29 +75,20 @@ pub async fn read_commands(
                                 arguments
                             );
                             if let Some(sending_player) = players.read().get(&sender_id) {
-                                sending_player.game_message(GameMessage::NotParsed);
+                                // TODO: Reintroduce consolidation here, somehow
+                                let response = String::from("Arglebargle, glop-glyf!?!?!");
+                                sending_player.game_message(response);
                             }
                         }
                     }
                 } else {
                     if let Some(sending_player) = players.read().get(&sender_id) {
                         tracing::debug!("Failed to parse player message: {:?}", command);
-                        sending_player.game_message(GameMessage::NotParsed);
+                        let response = String::from("Arglebargle, glop-glyf!?!?!");
+                        sending_player.game_message(response);
                     }
                 }
             }
         }
     }
 }
-//if let Some(sending_player) = players.read().get(&raw_command.sender()) {
-//sending_player.game_message(GameMessage::NotParsed);
-//}
-//}
-//}
-//} else {
-//if let Some(sending_player) = players.read().get(&raw_command.sender()) {
-//tracing::debug!("Failed to parse player message: {:?}", raw_command);
-//sending_player.game_message(GameMessage::NotParsed);
-//}
-//}
-//}
