@@ -5,6 +5,8 @@ use crate::{
     world::World,
 };
 
+use stylish::ansi::format as ansi_format;
+
 #[derive(Debug)]
 pub struct GossipAction {
     pub sender: u32,
@@ -28,7 +30,11 @@ impl PlayerAction for GossipAction {
 
         send_targeted_message(
             players,
-            format!("Gossip <{}>: {}", sending_player_username, self.content),
+            ansi_format!(
+                "{} gossips '{:(fg=cyan)}'",
+                sending_player_username,
+                self.content
+            ),
             // Send to everyone so don't bother with a real predicate
             |_| true,
         );
@@ -60,7 +66,11 @@ impl PlayerAction for SayAction {
 
         send_targeted_message(
             players,
-            format!("Say <{}>: {}", sending_player_username, self.content),
+            ansi_format!(
+                "{} says '{:(fg=yellow)}'",
+                sending_player_username,
+                self.content
+            ),
             // Send to everyone so don't bother with a real predicate
             |&(_, player)| player.current_room == room,
         );

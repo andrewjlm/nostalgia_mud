@@ -68,6 +68,8 @@ pub async fn handle_connection(
                 }
                 game_message = player_receiver.recv() => {
                     if let Some(message) = game_message {
+                        // TODO: Some sort of switching if color isn't supported using
+                        // stylish::plain
                         // If we get a message from the server, send it to the client
                         let _ = telnet.send(&message).await;
                     }

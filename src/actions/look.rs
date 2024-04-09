@@ -1,4 +1,5 @@
 use crate::{actions::PlayerAction, message::GameMessage, player::Players, world::World};
+use stylish::ansi::format as ansi_format;
 
 #[derive(Debug)]
 pub struct LookAction {
@@ -26,8 +27,12 @@ impl PlayerAction for LookAction {
                     }
                 };
 
-                sending_player
-                    .game_message(format!("{}\n{}\n{}", room.name, room.description, exits));
+                sending_player.game_message(ansi_format!(
+                    "{:(fg=green,bold)}\n{}\n{}",
+                    room.name,
+                    room.description,
+                    exits
+                ));
             }
         }
     }
