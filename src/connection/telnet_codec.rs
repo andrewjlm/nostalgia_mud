@@ -36,6 +36,7 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Prompt<T>
 where
     T: AsRef<str>,

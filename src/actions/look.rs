@@ -27,7 +27,7 @@ impl PlayerAction for LookAction {
                     }
                 };
 
-                sending_player.game_message(ansi_format!(
+                sending_player.send_message(ansi_format!(
                     "{:(fg=green,bold)}\n{}\n{}",
                     room.name,
                     room.description,

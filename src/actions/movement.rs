@@ -21,7 +21,7 @@ impl PlayerAction for MoveAction {
                 // exit north from here" when we'd probably say "north of
                 // here"). Should figure out a way to get consistent.
                 let response = format!("You don't see an exit {} from here", self.direction);
-                sending_player.game_message(response);
+                sending_player.send_message(response);
             }
         }
     }

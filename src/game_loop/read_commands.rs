@@ -1,6 +1,6 @@
 use crate::{
     actions::{self, PlayerAction},
-    message::{ConnectionMessage, GameMessage, PlayerMessage, RawCommand},
+    message::{ConnectionMessage, PlayerMessage, RawCommand},
     player::Players,
     world::World,
 };
@@ -77,7 +77,7 @@ pub async fn read_commands(
                             if let Some(sending_player) = players.read().get(&sender_id) {
                                 // TODO: Reintroduce consolidation here, somehow
                                 let response = String::from("Arglebargle, glop-glyf!?!?!");
-                                sending_player.game_message(response);
+                                sending_player.send_message(response);
                             }
                         }
                     }
@@ -85,8 +85,13 @@ pub async fn read_commands(
                     if let Some(sending_player) = players.read().get(&sender_id) {
                         tracing::debug!("Failed to parse player message: {:?}", command);
                         let response = String::from("Arglebargle, glop-glyf!?!?!");
-                        sending_player.game_message(response);
+                        sending_player.send_message(response);
                     }
+                }
+                // Send a new prompt to the player
+                if let Some(sending_player) = players.read().get(&sender_id) {
+                    let prompt = sending_player.prompt_str(&world);
+                    sending_player.send_prompt(prompt);
                 }
             }
         }

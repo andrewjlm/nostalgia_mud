@@ -89,6 +89,6 @@ where
     for (_id, player) in players.read().iter().filter(predicate) {
         tracing::debug!("Sending to {}", player.username);
         let message = message.clone();
-        player.game_message(message);
+        player.send_message(message);
     }
 }

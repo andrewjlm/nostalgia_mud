@@ -1,4 +1,4 @@
-use crate::message::GameMessage;
+use crate::{connection::Prompt, message::GameMessage, world::World};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tokio::sync::mpsc;
@@ -9,7 +9,7 @@ pub struct Player {
     pub id: u32,
     pub username: String,
     // Sender for sending GameMessages to the player
-    sender: mpsc::UnboundedSender<String>,
+    sender: mpsc::UnboundedSender<GameMessage>,
     // The player's current room
     // TODO: Should this be a reference? Makes things a mess but some things might only be possible
     // with it. In particular, I'm wondering if there is some sort of "Area" chat (Yell?). To use
@@ -22,7 +22,7 @@ impl Player {
     pub fn new(
         username: String,
         players: &Players,
-        sender: mpsc::UnboundedSender<String>,
+        sender: mpsc::UnboundedSender<GameMessage>,
         starting_room: u32,
     ) -> Player {
         let player_id = generate_player_id(players);
@@ -34,8 +34,12 @@ impl Player {
         }
     }
 
-    pub fn game_message(&self, message: String) {
-        let _ = self.sender.send(message);
+    pub fn send_message(&self, message: String) {
+        let _ = self.sender.send(GameMessage::Plain(message));
+    }
+
+    pub fn send_prompt(&self, prompt: String) {
+        let _ = self.sender.send(Prompt::new(prompt).into());
     }
 
     #[tracing::instrument(skip_all,
@@ -46,6 +50,27 @@ impl Player {
         // configurable - you either get a quick summary of where you are or a full "look"
         tracing::debug!("Player moved rooms");
         self.current_room = room_id;
+    }
+
+    pub fn prompt_str(&self, world: &World) -> String {
+        let exit_str = {
+            if let Some(exits) = world.get_player_exits(&self) {
+                // TODO: Global?
+                let cardinal_directions = vec!["north", "south", "east", "west", "up", "down"];
+                exits
+                    .iter()
+                    // For now, only include NSEWUD in the prompt
+                    .filter(|(d, _)| cardinal_directions.contains(&d.to_lowercase().as_str()))
+                    // Only include the first character
+                    .map(|(d, _)| d.chars().next().unwrap())
+                    .collect::<String>()
+                    .to_uppercase()
+            } else {
+                "".to_string()
+            }
+        };
+
+        format!("{} > ", exit_str)
     }
 }
 

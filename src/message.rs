@@ -1,4 +1,4 @@
-use crate::player::Player;
+use crate::{connection::Prompt, player::Player};
 
 pub enum ConnectionMessage {
     // Control messages for adding and removing players
@@ -105,33 +105,18 @@ pub enum PlayerMessage {
 // Messages that the game loop can send to connections
 #[derive(Debug, Clone)]
 pub enum GameMessage {
-    // Global Chat
-    Gossip(String, String),
-    Say(String, String),
-    Look(String),
-    NoExit(Direction),
-    NotParsed,
+    Plain(String),
+    Prompt(Prompt<String>),
 }
 
-impl GameMessage {
-    pub fn to_response(&self) -> String {
-        match self {
-            GameMessage::Gossip(content, sending_user) => {
-                format!("Gossip <{}>: {}", sending_user, content)
-            }
-            GameMessage::Say(content, sending_user) => {
-                format!("Say <{}>: {}", sending_user, content)
-            }
-            GameMessage::Look(description) => {
-                format!("{}", description)
-            }
-            GameMessage::NotParsed => String::from("Arglebargle, glop-glyf!?!?!"),
-            GameMessage::NoExit(direction) => {
-                // TODO: This will read sort of awkward (eg "You don't see an
-                // exit north from here" when we'd probably say "north of
-                // here"). Should figure out a way to get consistent.
-                format!("You don't see an exit {} from here", direction)
-            }
-        }
+impl From<String> for GameMessage {
+    fn from(s: String) -> Self {
+        GameMessage::Plain(s)
+    }
+}
+
+impl From<Prompt<String>> for GameMessage {
+    fn from(ps: Prompt<String>) -> Self {
+        GameMessage::Prompt(ps)
     }
 }

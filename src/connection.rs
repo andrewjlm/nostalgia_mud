@@ -1,5 +1,5 @@
 use crate::{
-    message::ConnectionMessage,
+    message::{ConnectionMessage, GameMessage},
     player::{Player, Players},
 };
 use tokio::{net::TcpStream, sync::mpsc};
@@ -13,7 +13,8 @@ mod login;
 use login::login_prompt;
 
 mod telnet_codec;
-use telnet_codec::{Prompt, TelnetCodec};
+pub use telnet_codec::Prompt;
+use telnet_codec::TelnetCodec;
 
 #[tracing::instrument(skip_all,
                       fields(peer_addr = %stream.peer_addr().unwrap(),
@@ -67,11 +68,20 @@ pub async fn handle_connection(
                     }
                 }
                 game_message = player_receiver.recv() => {
+                    // TODO: Some sort of switching if color isn't supported using
+                    // stylish::plain
+                    // If we get a message from the server, send it to the client
                     if let Some(message) = game_message {
-                        // TODO: Some sort of switching if color isn't supported using
-                        // stylish::plain
-                        // If we get a message from the server, send it to the client
-                        let _ = telnet.send(&message).await;
+                        // TODO: It feels like we could make this more ergonomic but I'm not sure
+                        // how.
+                        match message {
+                            GameMessage::Plain(s) => {
+                                let _ = telnet.send(&s).await;
+                            }
+                            GameMessage::Prompt(p) => {
+                                let _ = telnet.send(p).await;
+                            }
+                        }
                     }
                 }
             }
