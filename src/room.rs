@@ -1,3 +1,4 @@
+use crate::player::{Player, Players};
 use std::collections::HashMap;
 
 pub struct Room {
@@ -28,6 +29,15 @@ impl Room {
 
     pub fn get_exit(&self, direction: &str) -> Option<&u32> {
         self.exits.get(direction)
+    }
+
+    pub fn get_players(&self, players: &Players) -> Vec<u32> {
+        players
+            .read()
+            .iter()
+            .filter(|(id, p)| p.current_room == self.id)
+            .map(|(id, _)| *id)
+            .collect()
     }
 }
 
