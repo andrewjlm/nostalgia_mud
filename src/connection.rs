@@ -42,7 +42,7 @@ pub async fn handle_connection(
         // players
         // TODO: Right now everyone ALWAYS starts in the same room. Also, if Room 1 doesn't
         // exist... not sure what happens but presumably bad
-        let player = Player::new(username, &players, player_sender, 1);
+        let player = Player::new(username, &players, player_sender, 3001);
         // Reserve a copy of the ID for downstream usage
         let player_id = player.id;
         let create_player_command = ConnectionMessage::AddPlayer(player);
