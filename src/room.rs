@@ -1,4 +1,8 @@
-use crate::player::{Player, Players};
+use crate::{
+    mobiles::MobileInstance,
+    player::{Player, Players},
+    world::World,
+};
 use std::collections::HashMap;
 
 pub struct Room {
@@ -36,6 +40,16 @@ impl Room {
             .read()
             .iter()
             .filter(|(id, p)| p.current_room == self.id)
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    pub fn get_mobiles(&self, world: &World) -> Vec<u32> {
+        // NOTE: It's kinda weird to not return references, right...
+        world
+            .mobiles
+            .iter()
+            .filter(|(id, m)| m.current_room == self.id)
             .map(|(id, _)| *id)
             .collect()
     }

@@ -8,7 +8,9 @@ mod connection;
 mod game_loop;
 mod merc;
 mod message;
+mod mobiles;
 mod player;
+mod reset;
 mod room;
 mod world;
 
@@ -27,7 +29,8 @@ async fn main() {
 
     let players = player::Players::new();
     let midgard = merc::load_area_file("midgard.are");
-    let world = Arc::new(midgard);
+    let mut world = Arc::new(midgard);
+    world.reset();
 
     // TODO: Should ensure players always span into a particular room that cannot fail
 

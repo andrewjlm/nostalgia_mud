@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
+use crate::mobiles::{Mobile, MobileInstance};
 use crate::player::Player;
+use crate::reset::ResetCommand;
 use crate::room::{get_sample_rooms, Room};
 
 // TODO: We might want to do something similar to what we did to the Players struct in terms of
@@ -9,12 +11,36 @@ use crate::room::{get_sample_rooms, Room};
 // world.
 pub struct World {
     rooms: HashMap<u32, Room>,
+    mobile_templates: HashMap<u32, Mobile>,
+    // TODO: Better accessing...
+    pub mobiles: HashMap<u32, MobileInstance>,
+    resets: Vec<ResetCommand>,
 }
 
 impl World {
     pub fn new() -> Self {
         World {
             rooms: HashMap::new(),
+            mobile_templates: HashMap::new(),
+            mobiles: HashMap::new(),
+            resets: Vec::new(),
+        }
+    }
+
+    pub fn reset(&mut self) {
+        // Perform any resets
+        for reset in &self.resets {
+            // TODO: Check if we actually need to run the reset
+            let template = self.mobile_templates.get(&reset.mobile_id).unwrap().clone();
+            let target_room = reset.room_id;
+            // TODO: Actually generate ID
+            let mi = MobileInstance {
+                id: 1,
+                template: template,
+                current_room: target_room,
+            };
+
+            self.mobiles.insert(mi.id, mi);
         }
     }
 

@@ -27,23 +27,34 @@ impl PlayerAction for LookAction {
                     }
                 };
 
-                let other_players = {
-                    let players_in_room = room.get_players(&players);
-                    if players_in_room.len() == 1 {
+                let mut other_characters: Vec<String> = Vec::new();
+
+                let players_in_room = room.get_players(&players);
+                {
+                    let guard = players.read();
+                    let players_list = players_in_room
+                        .iter()
+                        // Don't tell us that we're in the room, we know that.
+                        .filter(|key| *key != &self.sender)
+                        .filter_map(|key| guard.get(key))
+                        .map(|p| p.username.clone());
+                    other_characters.extend(players_list);
+                }
+
+                // TODO: Consolidate this and other_players
+                let mobiles_in_room = room.get_mobiles(world);
+                let mobiles_list = mobiles_in_room
+                    .iter()
+                    .filter_map(|key| world.mobiles.get(key))
+                    .map(|m| m.template.room_description.clone());
+
+                other_characters.extend(mobiles_list);
+
+                let other_characters_string = {
+                    if other_characters.len() == 0 {
                         String::from("You're the only one here.")
-                    } else if players_in_room.len() >= 2 {
-                        let guard = players.read();
-                        let players_list = players_in_room
-                            .iter()
-                            // Don't tell us that we're in the room, we know that.
-                            .filter(|key| *key != &self.sender)
-                            .filter_map(|key| guard.get(key))
-                            .map(|p| p.username.clone())
-                            .collect::<Vec<_>>()
-                            .join(", ");
-                        format!("You see {} here.", players_list)
                     } else {
-                        unreachable!()
+                        other_characters.join(", ")
                     }
                 };
 
@@ -52,7 +63,7 @@ impl PlayerAction for LookAction {
                     room.name,
                     room.description,
                     exits,
-                    other_players
+                    other_characters_string
                 ));
             }
         }
