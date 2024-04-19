@@ -1,8 +1,8 @@
 #[derive(Clone)]
 pub struct Mobile {
     // TODO: Type aliases for all these IDs...
-    id: u32,
-    keywords: Vec<String>,
+    pub id: u32,
+    pub keywords: Vec<String>,
     pub room_description: String,
 }
 

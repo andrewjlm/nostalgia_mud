@@ -1,3 +1,5 @@
+use clap::Parser;
+use clio::InputPath;
 use std::sync::Arc;
 use tokio::{net::TcpListener, sync::mpsc};
 
@@ -17,6 +19,17 @@ mod world;
 use connection::handle_connection;
 use game_loop::game_loop;
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    // Area filename to load
+    #[arg(short, long)]
+    #[clap(value_parser)]
+    area_file: InputPath,
+    #[arg(short, long)]
+    port: u16,
+}
+
 #[tokio::main]
 async fn main() {
     // TODO: Implement shutdown via ctrl-c or a command from a wiz
@@ -24,12 +37,20 @@ async fn main() {
     // Start logging
     let subscriber = tracing_subscriber::fmt::init();
 
-    let listener = TcpListener::bind("127.0.0.1:4073").await.unwrap();
-    tracing::info!("Telnet server started on localhost:4073");
+    // Parse the CLI arguments
+    let args = Args::parse();
+
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", args.port))
+        .await
+        .unwrap();
+    tracing::info!("Telnet server started on localhost:{}", args.port);
 
     let players = player::Players::new();
-    let midgard = merc::load_area_file("midgard.are");
-    let mut world = Arc::new(midgard);
+
+    // Open the provided area file
+    let mut area_file = args.area_file.open().unwrap();
+    let midgard = merc::load_area_file(area_file);
+    let mut world = midgard;
     world.reset();
 
     // TODO: Should ensure players always span into a particular room that cannot fail
@@ -37,7 +58,7 @@ async fn main() {
     // Channel shared among clients and the game loop
     let (game_sender, game_receiver) = mpsc::channel(32);
 
-    tokio::spawn(game_loop(players.clone(), world.clone(), game_receiver));
+    tokio::spawn(game_loop(players.clone(), world, game_receiver));
 
     loop {
         let (stream, _) = listener.accept().await.unwrap();

@@ -54,7 +54,7 @@ impl PlayerAction for LookAction {
                     if other_characters.len() == 0 {
                         String::from("You're the only one here.")
                     } else {
-                        other_characters.join(", ")
+                        format!("You see {} here.", other_characters.join(", "))
                     }
                 };
 

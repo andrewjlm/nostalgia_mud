@@ -51,6 +51,14 @@ impl World {
         self.rooms.insert(room.id, room);
     }
 
+    pub fn add_mobile_template(&mut self, mobile: Mobile) {
+        self.mobile_templates.insert(mobile.id, mobile);
+    }
+
+    pub fn add_reset(&mut self, reset: ResetCommand) {
+        self.resets.push(reset);
+    }
+
     pub fn get_room(&self, room_id: u32) -> Option<&Room> {
         self.rooms.get(&room_id)
     }

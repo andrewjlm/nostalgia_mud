@@ -11,7 +11,7 @@ use tick::tick;
 #[tracing::instrument(skip_all)]
 pub async fn game_loop(
     players: Players,
-    world: Arc<World>,
+    world: World,
     mut receiver: mpsc::Receiver<ConnectionMessage>,
 ) {
     tracing::info!("Game loop spawned");

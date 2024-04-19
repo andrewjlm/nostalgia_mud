@@ -4,12 +4,11 @@ use crate::{
     player::Players,
     world::World,
 };
-use std::sync::Arc;
 use tokio::sync::mpsc;
 
 pub async fn read_commands(
     players: &Players,
-    world: &Arc<World>,
+    world: &World,
     receiver: &mut mpsc::Receiver<ConnectionMessage>,
 ) {
     // Game logic goes here

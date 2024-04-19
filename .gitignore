@@ -1,1 +1,4 @@
 /target
+
+# I don't want to distribute area files with this
+*.are

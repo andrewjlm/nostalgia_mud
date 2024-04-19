@@ -1,16 +1,12 @@
 // Implement for compatability with Diku/Merc style areas
-use crate::{room::Room, world::World};
-use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use crate::{mobiles::Mobile, reset::ResetCommand, room::Room, world::World};
+use std::io::Read;
 
-use merc_parser::parse_area_file;
+use merc_parser::{parse_area_file, RomResetCommand};
 
-pub fn load_area_file(filename: &str) -> World {
-    // TODO: More descriptive error?
-    let file = File::open(filename).expect("Unable to open file.");
-    let mut reader = BufReader::new(file);
+pub fn load_area_file<R: Read>(mut area_file: R) -> World {
     let mut buffer = String::new();
-    reader.read_to_string(&mut buffer);
+    area_file.read_to_string(&mut buffer);
 
     let mut world = World::new();
 
@@ -35,6 +31,32 @@ pub fn load_area_file(filename: &str) -> World {
         }
 
         world.add_room(room);
+    }
+
+    // Iterate over the mobs in the file and turn into our internal representation
+    for m in parsed_area.mobiles {
+        let mobile = Mobile {
+            id: u32::try_from(m.vnum).unwrap(),
+            keywords: m.keywords,
+            room_description: m.short_description,
+        };
+
+        world.add_mobile_template(mobile);
+    }
+
+    // Same with resets
+    for r in parsed_area.resets {
+        let reset = {
+            match r {
+                RomResetCommand::LoadMobile(lm) => ResetCommand {
+                    mobile_id: u32::try_from(lm.mobile_vnum).unwrap(),
+                    room_id: u32::try_from(lm.room_vnum).unwrap(),
+                },
+                _ => unimplemented!(),
+            }
+        };
+
+        world.add_reset(reset);
     }
 
     world
