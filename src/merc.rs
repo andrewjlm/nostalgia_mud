@@ -11,6 +11,11 @@ pub fn load_area_file<R: Read>(mut area_file: R) -> World {
     let mut world = World::new();
 
     let (_, parsed_area) = parse_area_file(&buffer).unwrap();
+    tracing::info!(
+        area_name = parsed_area.metadata.display_name,
+        area_author = parsed_area.metadata.author,
+        "Loaded ROM area file"
+    );
 
     // Iterate over the rooms in the file and turn into our internal representation
     for r in parsed_area.rooms {
@@ -30,6 +35,11 @@ pub fn load_area_file<R: Read>(mut area_file: R) -> World {
             room.add_exit(direction, d.to_room);
         }
 
+        tracing::debug!(
+            room_id = room.id,
+            room_name = room.name,
+            "Adding room to world"
+        );
         world.add_room(room);
     }
 
@@ -41,6 +51,11 @@ pub fn load_area_file<R: Read>(mut area_file: R) -> World {
             room_description: m.short_description,
         };
 
+        tracing::debug!(
+            mobile_id = mobile.id,
+            mobile_name = mobile.room_description,
+            "Adding mobile template to world"
+        );
         world.add_mobile_template(mobile);
     }
 
@@ -55,6 +70,13 @@ pub fn load_area_file<R: Read>(mut area_file: R) -> World {
                 _ => unimplemented!(),
             }
         };
+
+        tracing::debug!(
+            // TODO: Do everything different depending on the type of reset command we have
+            reset.mobile_id,
+            reset.room_id,
+            "Adding reset to world"
+        );
 
         world.add_reset(reset);
     }

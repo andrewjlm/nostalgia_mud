@@ -43,12 +43,13 @@ async fn main() {
     let listener = TcpListener::bind(format!("127.0.0.1:{}", args.port))
         .await
         .unwrap();
-    tracing::info!("Telnet server started on localhost:{}", args.port);
+    tracing::info!(port = args.port, "Starting Telnet server");
 
     let players = player::Players::new();
 
     // Open the provided area file
-    let mut area_file = args.area_file.open().unwrap();
+    tracing::info!(filename = %args.area_file, "Loading area file");
+    let area_file = args.area_file.open().unwrap();
     let midgard = merc::load_area_file(area_file);
     let mut world = midgard;
     world.reset();
