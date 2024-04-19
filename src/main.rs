@@ -71,12 +71,16 @@ async fn main() {
     let players = player::Players::new();
     let mut world = World::new();
 
+    // TODO: If the area list is empty (or there is no area list in the config file), load the
+    // default set of rooms we built
     for area_file in config.areas {
         tracing::info!(filename = ?area_file, "Loading area file");
         let area_file = File::open(area_file).unwrap();
         let area = merc::load_area_file(area_file);
         world.add_area(area);
     }
+
+    // TODO: Validation of provided areas
 
     // Call an initial reset of the world to place all the mobs and objects
     world.reset();
