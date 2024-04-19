@@ -1,10 +1,12 @@
 use crate::{player::Players, world::World};
 
 mod communication;
+mod debug;
 mod look;
 mod movement;
 
 pub use communication::*;
+pub use debug::*;
 pub use look::*;
 pub use movement::*;
 

@@ -62,6 +62,8 @@ impl RawCommand {
                     "w" | "west" => Some(PlayerMessage::Move(Direction::West)),
                     "u" | "up" => Some(PlayerMessage::Move(Direction::Up)),
                     "d" | "down" => Some(PlayerMessage::Move(Direction::Down)),
+                    // NOTE: Some debug commands
+                    "mobs" | "mobiles" => Some(PlayerMessage::Mobiles),
                     _ => {
                         // If no explicit command is matched, flag for possible contextual commands (such as an
                         // exit to a room that isn't one of the explicitly defined ones)
@@ -100,6 +102,8 @@ pub enum PlayerMessage {
     Contextual(String, String),
     // Predefined Movements
     Move(Direction),
+    // DEBUG STUFF
+    Mobiles,
 }
 
 // Messages that the game loop can send to connections

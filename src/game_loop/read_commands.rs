@@ -67,6 +67,11 @@ pub async fn read_commands(
                             move_action.perform(&players, &world);
                             look_action.perform(&players, &world);
                         }
+                        PlayerMessage::Mobiles => {
+                            let action = actions::MobileAction { sender: sender_id };
+
+                            action.perform(&players, &world);
+                        }
                         PlayerMessage::Contextual(command, arguments) => {
                             tracing::debug!(
                                 "Failed to parse potential contextual player message: {} {}",

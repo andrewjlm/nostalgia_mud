@@ -30,16 +30,24 @@ impl World {
     pub fn reset(&mut self) {
         // Perform any resets
         for reset in &self.resets {
+            tracing::info!("Performing reset {:?}", reset);
             // TODO: Check if we actually need to run the reset
             let template = self.mobile_templates.get(&reset.mobile_id).unwrap().clone();
             let target_room = reset.room_id;
-            // TODO: Actually generate ID
+
+            // Generate a unique ID for the MobileInstance
+            let mut id = 1;
+            while self.mobiles.contains_key(&id) {
+                id += 1;
+            }
+
             let mi = MobileInstance {
-                id: 1,
+                id: id,
                 template: template,
                 current_room: target_room,
             };
 
+            // TODO: Add check here that we're not inserting into an already used ID
             self.mobiles.insert(mi.id, mi);
         }
     }

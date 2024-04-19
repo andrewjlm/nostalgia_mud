@@ -63,22 +63,27 @@ pub fn load_area_file<R: Read>(mut area_file: R) -> World {
     for r in parsed_area.resets {
         let reset = {
             match r {
-                RomResetCommand::LoadMobile(lm) => ResetCommand {
+                RomResetCommand::LoadMobile(lm) => Some(ResetCommand {
                     mobile_id: u32::try_from(lm.mobile_vnum).unwrap(),
                     room_id: u32::try_from(lm.room_vnum).unwrap(),
-                },
-                _ => unimplemented!(),
+                }),
+                _ => {
+                    tracing::warn!("Unimplemented reset {:?}", r);
+                    None
+                }
             }
         };
 
-        tracing::debug!(
-            // TODO: Do everything different depending on the type of reset command we have
-            reset.mobile_id,
-            reset.room_id,
-            "Adding reset to world"
-        );
+        if let Some(r) = reset {
+            tracing::debug!(
+                // TODO: Do everything different depending on the type of reset command we have
+                r.mobile_id,
+                r.room_id,
+                "Adding reset to world"
+            );
 
-        world.add_reset(reset);
+            world.add_reset(r);
+        }
     }
 
     world
