@@ -13,6 +13,7 @@ use tokio::{net::TcpListener, sync::mpsc};
 extern crate merc_parser;
 
 mod actions;
+mod area;
 mod connection;
 mod game_loop;
 mod merc;
@@ -25,6 +26,7 @@ mod world;
 
 use connection::handle_connection;
 use game_loop::game_loop;
+use world::World;
 
 #[derive(Parser, Debug, Deserialize, Serialize)]
 #[command(version, about, long_about = None)]
@@ -59,7 +61,7 @@ async fn main() {
         .extract()
         .unwrap();
 
-    println!("{:?}", config);
+    // TODO: Debug tracing of config load
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port))
         .await
@@ -67,14 +69,16 @@ async fn main() {
     tracing::info!(port = config.port, "Starting Telnet server");
 
     let players = player::Players::new();
+    let mut world = World::new();
 
-    let area_file = config.areas.iter().next().unwrap();
+    for area_file in config.areas {
+        tracing::info!(filename = ?area_file, "Loading area file");
+        let area_file = File::open(area_file).unwrap();
+        let area = merc::load_area_file(area_file);
+        world.add_area(area);
+    }
 
-    // Open the provided area file
-    tracing::info!(filename = ?area_file, "Loading area file");
-    let area_file = File::open(area_file).unwrap();
-    let midgard = merc::load_area_file(area_file);
-    let mut world = midgard;
+    // Call an initial reset of the world to place all the mobs and objects
     world.reset();
 
     // TODO: Should ensure players always span into a particular room that cannot fail

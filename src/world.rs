@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::area::Area;
 use crate::mobiles::{Mobile, MobileInstance};
 use crate::player::Player;
 use crate::reset::ResetCommand;
@@ -52,8 +53,20 @@ impl World {
         }
     }
 
-    // TODO: I like having some kind of way to make this by collecting a list of rooms into the
-    // internal hashmap
+    pub fn add_area(&mut self, area: Area) {
+        // TODO: Right now we just put all the areas into one "scope"
+        for r in area.rooms {
+            self.rooms.insert(r.id, r);
+        }
+
+        for m in area.mobiles {
+            self.mobile_templates.insert(m.id, m);
+        }
+
+        for rc in area.resets {
+            self.resets.push(rc);
+        }
+    }
 
     pub fn add_room(&mut self, room: Room) {
         self.rooms.insert(room.id, room);

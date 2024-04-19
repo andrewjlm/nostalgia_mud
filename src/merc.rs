@@ -1,10 +1,10 @@
 // Implement for compatability with Diku/Merc style areas
-use crate::{mobiles::Mobile, reset::ResetCommand, room::Room, world::World};
+use crate::{area::Area, mobiles::Mobile, reset::ResetCommand, room::Room, world::World};
 use std::io::Read;
 
 use merc_parser::{parse_area_file, RomResetCommand};
 
-pub fn load_area_file<R: Read>(mut area_file: R) -> World {
+pub fn load_area_file<R: Read>(mut area_file: R) -> Area {
     let mut buffer = String::new();
     area_file.read_to_string(&mut buffer);
 
@@ -18,6 +18,7 @@ pub fn load_area_file<R: Read>(mut area_file: R) -> World {
     );
 
     // Iterate over the rooms in the file and turn into our internal representation
+    let mut rooms: Vec<Room> = Vec::with_capacity(parsed_area.rooms.len());
     for r in parsed_area.rooms {
         let mut room = Room::new(r.vnum, &r.room_name, &r.description);
 
@@ -40,10 +41,11 @@ pub fn load_area_file<R: Read>(mut area_file: R) -> World {
             room_name = room.name,
             "Adding room to world"
         );
-        world.add_room(room);
+        rooms.push(room);
     }
 
     // Iterate over the mobs in the file and turn into our internal representation
+    let mut mobiles: Vec<Mobile> = Vec::with_capacity(parsed_area.mobiles.len());
     for m in parsed_area.mobiles {
         let mobile = Mobile {
             id: u32::try_from(m.vnum).unwrap(),
@@ -56,10 +58,11 @@ pub fn load_area_file<R: Read>(mut area_file: R) -> World {
             mobile_name = mobile.room_description,
             "Adding mobile template to world"
         );
-        world.add_mobile_template(mobile);
+        mobiles.push(mobile);
     }
 
     // Same with resets
+    let mut resets: Vec<ResetCommand> = Vec::with_capacity(parsed_area.resets.len());
     for r in parsed_area.resets {
         let reset = {
             match r {
@@ -82,9 +85,13 @@ pub fn load_area_file<R: Read>(mut area_file: R) -> World {
                 "Adding reset to world"
             );
 
-            world.add_reset(r);
+            resets.push(r);
         }
     }
 
-    world
+    Area {
+        rooms,
+        mobiles,
+        resets,
+    }
 }
