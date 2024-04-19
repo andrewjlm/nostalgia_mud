@@ -1,6 +1,13 @@
+use std::fs::File;
+use std::path::PathBuf;
+
 use clap::Parser;
-use clio::InputPath;
-use std::sync::Arc;
+use figment::{
+    providers::{Format, Toml},
+    Figment,
+};
+use patharg::InputArg;
+use serde::{Deserialize, Serialize};
 use tokio::{net::TcpListener, sync::mpsc};
 
 extern crate merc_parser;
@@ -19,14 +26,18 @@ mod world;
 use connection::handle_connection;
 use game_loop::game_loop;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Deserialize, Serialize)]
 #[command(version, about, long_about = None)]
 struct Args {
-    // Area filename to load
+    // Path to config file
     #[arg(short, long)]
     #[clap(value_parser)]
-    area_file: InputPath,
-    #[arg(short, long)]
+    config_file: InputArg,
+}
+
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
+struct Config {
+    areas: Vec<PathBuf>,
     port: u16,
 }
 
@@ -37,19 +48,31 @@ async fn main() {
     // Start logging
     let subscriber = tracing_subscriber::fmt::init();
 
-    // Parse the CLI arguments
+    // Parse the CLI argument
     let args = Args::parse();
+    // Read the config file
+    let config: Config = Figment::new()
+        .merge(Toml::string(
+            // TODO: This is ugly
+            args.config_file.read_to_string().unwrap().as_str(),
+        ))
+        .extract()
+        .unwrap();
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", args.port))
+    println!("{:?}", config);
+
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", config.port))
         .await
         .unwrap();
-    tracing::info!(port = args.port, "Starting Telnet server");
+    tracing::info!(port = config.port, "Starting Telnet server");
 
     let players = player::Players::new();
 
+    let area_file = config.areas.iter().next().unwrap();
+
     // Open the provided area file
-    tracing::info!(filename = %args.area_file, "Loading area file");
-    let area_file = args.area_file.open().unwrap();
+    tracing::info!(filename = ?area_file, "Loading area file");
+    let area_file = File::open(area_file).unwrap();
     let midgard = merc::load_area_file(area_file);
     let mut world = midgard;
     world.reset();

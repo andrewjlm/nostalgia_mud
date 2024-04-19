@@ -1,0 +1,3 @@
+port = 4073
+areas = ["areas/midgard.are", "areas/school.are"]
+recall_vnum = 3001
